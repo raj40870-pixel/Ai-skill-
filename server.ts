@@ -175,30 +175,11 @@ function cleanJSONResponse(text: string): string {
 }
 
 function mapSelectedModelToGemini(modelName?: string): string {
-  if (!modelName) return "gemini-3.7-flash";
-  const name = modelName.toLowerCase().trim();
-  
-  if (name === "gemini-3.1-flash-lite" || name.includes("flash lite") || name.includes("flash-lite") || name.includes("8b")) {
-    return "gemini-1.5-flash-8b";
-  }
-  if (name.includes("3.1 flash") || name.includes("3.1-flash")) {
-    return "gemini-1.5-flash"; // Map to 1.5 flash if 3.1 is not natively supported in the SDK version
-  }
-  if (name.includes("1.5 flash") || name.includes("1.5-flash")) {
-    return "gemini-1.5-flash";
-  }
-  if (name.includes("1.5 pro") || name.includes("1.5-pro")) {
-    return "gemini-1.5-pro";
-  }
-  if (name === "gemini-3.1-pro-preview" || name.includes("pro-preview") || name.includes("3.1 pro") || name.includes("gemini pro")) {
-    return "gemini-3.1-pro-preview";
-  }
-  if (name === "gemini-3.7-flash" || name.includes("3.7 flash") || name.includes("3.7-flash") || name.includes("flash")) {
-    return "gemini-3.7-flash";
-  }
-  
+  // Map all models to gemini-3.7-flash since older models (1.5, 3.1) are deprecated
+  // or restricted for new AI Studio project credentials (which use the AQ. prefix).
   return "gemini-3.7-flash";
 }
+
 
 async function checkHistoryLimit(uid: string) {
   let count = 0;
@@ -3613,96 +3594,6 @@ Cloud Platform Service | Tech: React, Node.js, MongoDB`;
       details: process.env.NODE_ENV !== "production" ? err.stack : undefined
     });
   });
-
-  app.get("/api/diag", async (req, res) => {
-    try {
-      const rawKey = process.env.GEMINI_API_KEY || "";
-      const isSet = !!rawKey;
-      const keyLength = rawKey.length;
-      const maskedKey = isSet 
-        ? rawKey.substring(0, 6) + "..." + rawKey.substring(Math.max(6, keyLength - 4))
-        : "NOT_SET";
-
-      let geminiStatus = "Checking...";
-      let errorDetails = "";
-      
-      try {
-        const client = getAI(false);
-        const testResp = await client.models.generateContent({
-          model: "gemini-1.5-flash",
-          contents: "Hello, answer in one word: OK"
-        });
-        geminiStatus = `Success: ${testResp.text?.trim()}`;
-      } catch (geminiErr: any) {
-        geminiStatus = "Failed";
-        errorDetails = geminiErr.message || String(geminiErr);
-      }
-
-      res.json({
-        isApiKeySet: isSet,
-        keyLength,
-        maskedKey,
-        geminiStatus,
-        errorDetails,
-        nodeEnv: process.env.NODE_ENV,
-        mongoStatus: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected"
-      });
-    } catch (globalErr: any) {
-      res.status(500).json({ error: globalErr.message });
-    }
-  });
-
-  app.get("/api/diag", async (req, res) => {
-    try {
-      const rawKey = process.env.GEMINI_API_KEY || "";
-      const isSet = !!rawKey;
-      const keyLength = rawKey.length;
-      const maskedKey = isSet 
-        ? rawKey.substring(0, 6) + "..." + rawKey.substring(Math.max(6, keyLength - 4))
-        : "NOT_SET";
-
-      let status15 = "Checking...";
-      let error15 = "";
-      try {
-        const client = getAI(false);
-        const testResp = await client.models.generateContent({
-          model: "gemini-1.5-flash",
-          contents: "Hello, answer in one word: OK"
-        });
-        status15 = `Success: ${testResp.text?.trim()}`;
-      } catch (geminiErr: any) {
-        status15 = "Failed";
-        error15 = geminiErr.message || String(geminiErr);
-      }
-
-      let status37 = "Checking...";
-      let error37 = "";
-      try {
-        const client = getAI(false);
-        const testResp = await client.models.generateContent({
-          model: "gemini-3.7-flash",
-          contents: "Hello, answer in one word: OK"
-        });
-        status37 = `Success: ${testResp.text?.trim()}`;
-      } catch (geminiErr: any) {
-        status37 = "Failed";
-        error37 = geminiErr.message || String(geminiErr);
-      }
-
-      res.json({
-        isApiKeySet: isSet,
-        keyLength,
-        maskedKey,
-        test15: { status: status15, error: error15 },
-        test37: { status: status37, error: error37 },
-        nodeEnv: process.env.NODE_ENV,
-        mongoStatus: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected"
-      });
-    } catch (globalErr: any) {
-      res.status(500).json({ error: globalErr.message });
-    }
-  });
-
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
