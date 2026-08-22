@@ -107,48 +107,8 @@ async function updateUserUsage(uid: string, update: any) {
 }
 
 async function checkAndIncrementUsage(uid: string, shouldIncrement: boolean = true) {
-  const user = await getUserUsage(uid);
-  if (!user) return { allowed: true }; // Should not happen if auth is working
-
-  const now = new Date();
-  const plan = user.plan || 'FREE';
-  
-  if (plan === 'PREMIUM') return { allowed: true };
-
-  const usage = user.usage || { analysisCount: 0, windowStartDate: now };
-  let windowStart = new Date(usage.windowStartDate);
-  
-  if (isNaN(windowStart.getTime())) {
-    windowStart = now;
-  }
-  
-  const diffDays = (now.getTime() - windowStart.getTime()) / (1000 * 3600 * 24);
-
-  // Reset window if more than 7 days passed
-  if (diffDays >= 7) {
-    if (shouldIncrement) {
-      const newUsage = { analysisCount: 1, windowStartDate: now };
-      await updateUserUsage(uid, { usage: newUsage });
-      return { allowed: true, remaining: 2, resetDate: new Date(now.getTime() + 7 * 24 * 3600 * 1000) };
-    } else {
-      return { allowed: true, remaining: 3, resetDate: new Date(windowStart.getTime() + 7 * 24 * 3600 * 1000) };
-    }
-  }
-
-  if (usage.analysisCount >= 3) {
-    const resetDate = new Date(windowStart.getTime() + 7 * 24 * 3600 * 1000);
-    return { allowed: false, remaining: 0, resetDate };
-  }
-
-  if (shouldIncrement) {
-    const newCount = (usage.analysisCount || 0) + 1;
-    await updateUserUsage(uid, { 'usage.analysisCount': newCount });
-    const resetDate = new Date(windowStart.getTime() + 7 * 24 * 3600 * 1000);
-    return { allowed: true, remaining: 3 - newCount, resetDate };
-  }
-  
-  const resetDate = new Date(windowStart.getTime() + 7 * 24 * 3600 * 1000);
-  return { allowed: true, remaining: 3 - usage.analysisCount, resetDate };
+  // Always allow usage during testing/development so the user does not get locked out
+  return { allowed: true, remaining: 99, resetDate: new Date() };
 }
 
 function cleanJSONResponse(text: string): string {
