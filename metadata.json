@@ -1,0 +1,8 @@
+{
+  "name": "Career Navigation AI",
+  "description": "Career Nav AI - Global Market Analyzer. Zero-percentage, no-score live comparison connecting your resume against real global market job data.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
