@@ -3652,6 +3652,57 @@ Cloud Platform Service | Tech: React, Node.js, MongoDB`;
     }
   });
 
+  app.get("/api/diag", async (req, res) => {
+    try {
+      const rawKey = process.env.GEMINI_API_KEY || "";
+      const isSet = !!rawKey;
+      const keyLength = rawKey.length;
+      const maskedKey = isSet 
+        ? rawKey.substring(0, 6) + "..." + rawKey.substring(Math.max(6, keyLength - 4))
+        : "NOT_SET";
+
+      let status15 = "Checking...";
+      let error15 = "";
+      try {
+        const client = getAI(false);
+        const testResp = await client.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: "Hello, answer in one word: OK"
+        });
+        status15 = `Success: ${testResp.text?.trim()}`;
+      } catch (geminiErr: any) {
+        status15 = "Failed";
+        error15 = geminiErr.message || String(geminiErr);
+      }
+
+      let status37 = "Checking...";
+      let error37 = "";
+      try {
+        const client = getAI(false);
+        const testResp = await client.models.generateContent({
+          model: "gemini-3.7-flash",
+          contents: "Hello, answer in one word: OK"
+        });
+        status37 = `Success: ${testResp.text?.trim()}`;
+      } catch (geminiErr: any) {
+        status37 = "Failed";
+        error37 = geminiErr.message || String(geminiErr);
+      }
+
+      res.json({
+        isApiKeySet: isSet,
+        keyLength,
+        maskedKey,
+        test15: { status: status15, error: error15 },
+        test37: { status: status37, error: error37 },
+        nodeEnv: process.env.NODE_ENV,
+        mongoStatus: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected"
+      });
+    } catch (globalErr: any) {
+      res.status(500).json({ error: globalErr.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
