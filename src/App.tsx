@@ -74,8 +74,34 @@ const FALLBACK_ROADMAP_DATA: RoadmapData = {
         }
       ]
     }
+  ],
+  skill_gap_report: {
+    missing_skills: [
+      { category: "Technical Skill", skill: "System Design & Architecture", priority: "High", reason: "Standard requirement for progressive technical roles.", market_demand_trend: "High", suggested_improvement: "Study system architecture patterns and read developer docs." },
+      { category: "Framework", skill: "React / Next.js", priority: "High", reason: "Industry standard frontend framework for modern interactive UIs.", market_demand_trend: "High", suggested_improvement: "Complete official tutorials and build a modular dashboard." },
+      { category: "Tool", skill: "Docker & Containerization", priority: "Medium", reason: "Standard utility for establishing consistent environments.", market_demand_trend: "Medium", suggested_improvement: "Containerize existing frontend and backend applications." }
+    ]
+  },
+  learning_resources: [
+    {
+      skill_or_topic: "System Design & Architecture",
+      official_documentation: "https://github.com/donnemartin/system-design-primer",
+      free_youtube_courses: "https://www.youtube.com/results?search_query=system+design+fundamentals",
+      practice_websites: "https://www.bytebytego.com",
+      project_ideas: "Design a distributed database caching wrapper.",
+      certification_recommendation: "AWS Certified Solutions Architect"
+    },
+    {
+      skill_or_topic: "React / Next.js",
+      official_documentation: "https://react.dev",
+      free_youtube_courses: "https://www.youtube.com/results?search_query=react+nextjs+crash+course",
+      practice_websites: "https://www.freecodecamp.org",
+      project_ideas: "Build a responsive task tracking dashboard.",
+      certification_recommendation: "Meta Front-End Developer Certificate"
+    }
   ]
 };
+
 
 export default function App() {
   const [user, setUser] = useState<MongoUser | null>(null);
@@ -452,6 +478,12 @@ export default function App() {
       } catch (roadErr) {
         console.error("Auto roadmap generation failed, fallback to default", roadErr);
         setRoadmap(FALLBACK_ROADMAP_DATA);
+        if (resumeId) {
+          await mongoApi.saveRoadmap(userId, resumeId, {
+            ...FALLBACK_ROADMAP_DATA,
+            marketAnalysis: market
+          }).catch(dbErr => console.error("Failed to save fallback roadmap to DB:", dbErr));
+        }
       }
 
       setTargetRole(selectedRole);

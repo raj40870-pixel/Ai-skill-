@@ -34,7 +34,26 @@ export interface RoadmapData {
       tasks: { type: 'course' | 'project' | 'skill'; title: string; platform?: string; hours?: number; tech?: string[]; details?: string }[];
     }[];
   }[];
+  skill_gap_report?: {
+    missing_skills: {
+      category: string;
+      skill: string;
+      priority: 'High' | 'Medium' | 'Low';
+      reason: string;
+      market_demand_trend: string;
+      suggested_improvement: string;
+    }[];
+  };
+  learning_resources?: {
+    skill_or_topic: string;
+    official_documentation: string;
+    free_youtube_courses: string;
+    practice_websites: string;
+    project_ideas: string;
+    certification_recommendation: string;
+  }[];
 }
+
 
 export interface AIModelOption {
   id: string;
