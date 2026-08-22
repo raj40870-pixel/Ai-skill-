@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://carrer-nav-ai-backend.onrender.com/api/:path*"
+      "destination": "https://ai-skill-t19t.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
