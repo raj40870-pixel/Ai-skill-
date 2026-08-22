@@ -3614,6 +3614,44 @@ Cloud Platform Service | Tech: React, Node.js, MongoDB`;
     });
   });
 
+  app.get("/api/diag", async (req, res) => {
+    try {
+      const rawKey = process.env.GEMINI_API_KEY || "";
+      const isSet = !!rawKey;
+      const keyLength = rawKey.length;
+      const maskedKey = isSet 
+        ? rawKey.substring(0, 6) + "..." + rawKey.substring(Math.max(6, keyLength - 4))
+        : "NOT_SET";
+
+      let geminiStatus = "Checking...";
+      let errorDetails = "";
+      
+      try {
+        const client = getAI(false);
+        const testResp = await client.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: "Hello, answer in one word: OK"
+        });
+        geminiStatus = `Success: ${testResp.text?.trim()}`;
+      } catch (geminiErr: any) {
+        geminiStatus = "Failed";
+        errorDetails = geminiErr.message || String(geminiErr);
+      }
+
+      res.json({
+        isApiKeySet: isSet,
+        keyLength,
+        maskedKey,
+        geminiStatus,
+        errorDetails,
+        nodeEnv: process.env.NODE_ENV,
+        mongoStatus: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected"
+      });
+    } catch (globalErr: any) {
+      res.status(500).json({ error: globalErr.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
