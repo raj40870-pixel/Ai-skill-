@@ -404,17 +404,83 @@ function getFallbackResume(text: string = ""): any {
 }
 
 function getFallbackATS(text: string, jobTitle: string = "Software Engineer"): any {
-  const len = text.length;
+  const lowercase = (text || "").toLowerCase();
   
-  // Seed distinct scores based on text length to represent real variation
-  const scoreSoftSkills = Math.min(100, Math.max(55, 60 + (len % 13)));
-  const scoreFrameworks = Math.min(100, Math.max(50, 52 + (len % 17)));
-  const scoreTools = Math.min(100, Math.max(55, 64 + (len % 11)));
-  const scoreExperience = Math.min(100, Math.max(45, 48 + (len % 19)));
-  const scoreProjects = Math.min(100, Math.max(50, 56 + (len % 15)));
-  const scoreEducation = Math.min(100, Math.max(60, 68 + (len % 7)));
-  const scoreImpact = Math.min(100, Math.max(40, 42 + (len % 23)));
-  const scoreFormat = Math.min(100, Math.max(70, 78 + (len % 5)));
+  // 1. Soft Skills Match (max 100)
+  const softSkills = ["leadership", "communication", "team", "player", "problem", "solving", "collaboration", "agile", "scrum", "decision", "prioritization", "management", "flexibility", "empathy", "coaching"];
+  let softMatchCount = 0;
+  softSkills.forEach(s => {
+    if (lowercase.includes(s)) softMatchCount++;
+  });
+  const scoreSoftSkills = Math.min(100, Math.max(50, 50 + (softMatchCount * 5)));
+
+  // 2. Frameworks Alignment (max 100)
+  const frameworks = ["react", "angular", "vue", "next.js", "nextjs", "django", "flask", "fastapi", "spring", "bootstrap", "tailwind", "jquery", "express", "expressjs", "numpy", "pandas", "matplotlib", "seaborn", "scikit-learn", "tensorflow", "pytorch", "keras", "hadoop", "spark"];
+  let frameworkMatchCount = 0;
+  frameworks.forEach(f => {
+    if (lowercase.includes(f)) frameworkMatchCount++;
+  });
+  const scoreFrameworks = Math.min(100, Math.max(45, 45 + (frameworkMatchCount * 7)));
+
+  // 3. Tools & Technologies (max 100)
+  const tools = ["git", "github", "gitlab", "docker", "kubernetes", "aws", "gcp", "azure", "mysql", "postgresql", "mongodb", "sqlite", "oracle", "sql server", "redis", "power bi", "tableau", "excel", "jira", "figma", "linux", "jenkins"];
+  let toolMatchCount = 0;
+  tools.forEach(t => {
+    if (lowercase.includes(t)) toolMatchCount++;
+  });
+  const scoreTools = Math.min(100, Math.max(50, 50 + (toolMatchCount * 6)));
+
+  // 4. Experience Quality & Depth (max 100)
+  const expKeywords = ["experience", "internship", "associate", "developer", "engineer", "lead", "senior", "junior", "professional", "history", "employment", "years"];
+  let expMatchCount = 0;
+  expKeywords.forEach(k => {
+    if (lowercase.includes(k)) expMatchCount++;
+  });
+  
+  const actionVerbs = ["led", "developed", "built", "designed", "managed", "implemented", "engineered", "created", "monitored", "delivered", "optimized", "collaborated"];
+  let verbCount = 0;
+  actionVerbs.forEach(v => {
+    const regex = new RegExp("\\b" + v + "\\b", "g");
+    const matches = lowercase.match(regex);
+    if (matches) verbCount += matches.length;
+  });
+  const scoreExperience = Math.min(100, Math.max(40, 40 + (expMatchCount * 3) + (verbCount * 2)));
+
+  // 5. Project Relevance & Quality (max 100)
+  const projKeywords = ["project", "projects", "github.com", "http", "link", "demo", "repository", "codebase"];
+  let projMatchCount = 0;
+  projKeywords.forEach(k => {
+    if (lowercase.includes(k)) projMatchCount++;
+  });
+  const scoreProjects = Math.min(100, Math.max(45, 45 + (projMatchCount * 8)));
+
+  // 6. Education & Certification Match (max 100)
+  const eduKeywords = ["education", "degree", "bachelor", "master", "university", "college", "school", "b.tech", "btech", "b.c.a", "bca", "mca", "b.s", "computer science", "engineering", "cgpa", "gpa", "percentage", "certificate", "certification", "certified", "coursera", "nptel", "deloitte", "ust"];
+  let eduMatchCount = 0;
+  eduKeywords.forEach(k => {
+    if (lowercase.includes(k)) eduMatchCount++;
+  });
+  const scoreEducation = Math.min(100, Math.max(55, 55 + (eduMatchCount * 4)));
+
+  // 7. Impact Quantification (max 100)
+  let metricCount = 0;
+  const percentageMatches = lowercase.match(/\d+%/g);
+  if (percentageMatches) metricCount += percentageMatches.length * 8;
+  const plusMatches = lowercase.match(/\d+\+/g);
+  if (plusMatches) metricCount += plusMatches.length * 5;
+  const actionQuantifiers = ["optimized by", "reduced by", "increased by", "efficiency by", "accuracy by", "saved", "improved by"];
+  actionQuantifiers.forEach(q => {
+    if (lowercase.includes(q)) metricCount += 10;
+  });
+  const scoreImpact = Math.min(100, Math.max(40, 40 + metricCount));
+
+  // 8. Format & Structure Compatibility (max 100)
+  const headings = ["skills", "experience", "education", "projects", "achievements", "certificates"];
+  let headingCount = 0;
+  headings.forEach(h => {
+    if (lowercase.includes(h)) headingCount++;
+  });
+  const scoreFormat = Math.min(100, Math.max(65, 65 + (headingCount * 6)));
 
   // Mathematically average the 8 categories exactly
   const finalScore = Math.round(
@@ -430,6 +496,7 @@ function getFallbackATS(text: string, jobTitle: string = "Software Engineer"): a
     label = "Skill Remediation Required";
     color = "rose";
   }
+
 
   const breakdownData = [
     {
@@ -2823,6 +2890,15 @@ async function startServer() {
           3. Match the candidate's existing resume text and skills:
              "${text}"
              against these real requirements to determine "How hireable is this candidate in the current market?". This score must reflect actual market hireability rather than how well formatted the resume is.
+             
+          IMPORTANT: Evaluate the candidate using a strict, professional grading rubric:
+          - Core Technical/Hard Skills Match (Frameworks, programming languages, databases, tools matching the target role): 30% weight
+          - Experience Depth & Quality (Duration, progressive responsibility, action verbs, industry context): 25% weight
+          - Projects & Practical Application (Scale, real-world complexity, link verification): 20% weight
+          - Impact Quantification (Explicit metrics, KPI numbers, e.g. "improved by 35%", performance scales): 15% weight
+          - Education & Professional Certifications (Degree level, alignment with engineering standards, industry certs): 10% weight
+          
+          Be highly critical. If the resume lacks quantitative metrics, penalize the score. If the candidate is a beginner/student or has typos/basic projects, score them lower (e.g. 50-70%). Do not give generic high scores.
              
           Return a valid, parsed JSON response containing:
           {
