@@ -3101,7 +3101,6 @@ async function startServer() {
           }`,
           config: {
             responseMimeType: "application/json",
-            tools: [{ googleSearch: {} }],
           }
         });
 
