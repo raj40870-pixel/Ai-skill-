@@ -2792,12 +2792,18 @@ async function startServer() {
 
         res.json(JSON.parse(cleanJSONResponse(response.text || "{}")));
       } catch (aiError: any) {
-        console.log("[server] [Offline Mode] Successfully processed resume parsing via verified local parser.");
-        res.json(getFallbackResume(text));
+        console.error("[server] [AI Error] Resume parse failed:", aiError?.message || aiError);
+        res.status(503).json({ 
+          error: "AI analysis temporarily unavailable. Please try again in a moment.",
+          details: aiError?.message || "Gemini service error"
+        });
       }
     } catch (globalErr: any) {
-      console.log("[server] [Local Fallback] Resolved resume response gracefully:", globalErr.message || globalErr);
-      res.json(getFallbackResume());
+      console.error("[server] [Global Error] Resume parse endpoint:", globalErr.message || globalErr);
+      res.status(500).json({ 
+        error: "Resume parsing failed. Please try uploading again.",
+        details: globalErr?.message || "Server error"
+      });
     }
   });
 
@@ -2871,13 +2877,18 @@ async function startServer() {
 
         res.json(JSON.parse(cleanJSONResponse(response.text || "{}")));
       } catch (aiError: any) {
-        console.log("[server] [Offline Mode] Successfully analyzed job-match compatibility via local ATS indexes.");
-        res.json(getFallbackATS(text, jobTitle));
+        console.error("[server] [AI Error] ATS scoring failed:", aiError?.message || aiError);
+        res.status(503).json({ 
+          error: "AI analysis temporarily unavailable. Please try again in a moment.",
+          details: aiError?.message || "Gemini service error"
+        });
       }
     } catch (globalErr: any) {
-      console.log("[server] [Local Fallback] Resolved ATS compatibility report gracefully:", globalErr.message || globalErr);
-      const { text = "", jobTitle = "General" } = req.body;
-      res.json(getFallbackATS(text, jobTitle));
+      console.error("[server] [Global Error] ATS endpoint:", globalErr.message || globalErr);
+      res.status(500).json({ 
+        error: "ATS scoring failed. Please try uploading again.",
+        details: globalErr?.message || "Server error"
+      });
     }
   });
 
@@ -3000,17 +3011,18 @@ async function startServer() {
         const refinedResult = refineRoadmapResources(result, roleStr);
         res.json(refinedResult);
       } catch (aiError: any) {
-        console.error("[server] AI generation failed, falling back to smart dynamic generator:", aiError);
-        const result = getFallbackRoadmap(parsedResume, currentRole, targetRole, Number(yoe || 1));
-        const refinedResult = refineRoadmapResources(result, targetRole || "Full Stack Developer");
-        res.json(refinedResult);
+        console.error("[server] [AI Error] Roadmap generation failed:", aiError?.message || aiError);
+        res.status(503).json({ 
+          error: "AI roadmap generation temporarily unavailable. Please try again in a moment.",
+          details: aiError?.message || "Gemini service error"
+        });
       }
     } catch (globalErr: any) {
-      console.log("[server] [Local Fallback] Generated target role roadmap gracefully:", globalErr.message || globalErr);
-      const { parsedResume, currentRole = "Current Role", targetRole = "Target Role", yoe = 3 } = req.body;
-      const result = getFallbackRoadmap(parsedResume, currentRole, targetRole, Number(yoe || 1));
-      const refinedResult = refineRoadmapResources(result, targetRole || "Full Stack Developer");
-      res.json(refinedResult);
+      console.error("[server] [Global Error] Roadmap endpoint:", globalErr.message || globalErr);
+      res.status(500).json({ 
+        error: "Roadmap generation failed. Please try uploading again.",
+        details: globalErr?.message || "Server error"
+      });
     }
   });
 
@@ -3066,13 +3078,18 @@ async function startServer() {
 
         res.json(JSON.parse(cleanJSONResponse(response.text || "{}")));
       } catch (aiError: any) {
-        console.log("[server] [Offline Mode] Successfully pulled compensation metrics from verified regional indices.");
-        res.json(getFallbackSalary(city, track, targetRole, skills, Number(yoe || 3)));
+        console.error("[server] [AI Error] Salary insights failed:", aiError?.message || aiError);
+        res.status(503).json({ 
+          error: "AI salary analysis temporarily unavailable. Please try again in a moment.",
+          details: aiError?.message || "Gemini service error"
+        });
       }
     } catch (globalErr: any) {
-      console.log("[server] [Local Fallback] Resolved salary search gracefully:", globalErr.message || globalErr);
-      const { city = "Bangalore", track = "Software Engineer", targetRole, skills, yoe } = req.body;
-      res.json(getFallbackSalary(city, track, targetRole, skills, Number(yoe || 3)));
+      console.error("[server] [Global Error] Salary endpoint:", globalErr.message || globalErr);
+      res.status(500).json({ 
+        error: "Salary insights failed. Please try again.",
+        details: globalErr?.message || "Server error"
+      });
     }
   });
 
