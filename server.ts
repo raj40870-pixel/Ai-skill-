@@ -68,7 +68,7 @@ function getAI(forceBackup: boolean = false): GoogleGenAI {
   }
 
   if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.trim() === "") {
-    throw new Error("GEMINI_API_KEY environment variable is not set. Please configure it in your deployment settings.");
+    throw new Error("GEMINI_API_KEY environment variable is not set.");
   }
 
   if (!aiClient || aiClientKey !== apiKey) {
@@ -264,7 +264,7 @@ function isFakeAccount(email: string, displayName: string): boolean {
   
   if (!isAllowedDomain) {
     // Permanent whitelist for developer/test accounts
-    const whitelistedEmails = ["k69117842@gmail.com", "raj40870@gmail.com"];
+    const whitelistedEmails = ["k69117842@gmail.com", "raj40870@gmail.com", "kamaljit444501@gmail.com"];
     if (!whitelistedEmails.includes(emailLower)) return true;
   }
 
@@ -285,7 +285,7 @@ function isFakeAccount(email: string, displayName: string): boolean {
   // 5. Excessive numbers (Bot-like naming)
   const digitCount = (s: string) => (s.match(/\d/g) || []).length;
   if (localPart.length < 15 && digitCount(localPart) > localPart.length * 0.75) {
-    if (emailLower !== "k69117842@gmail.com" && emailLower !== "raj40870@gmail.com") return true;
+    if (emailLower !== "k69117842@gmail.com" && emailLower !== "raj40870@gmail.com" && emailLower !== "kamaljit444501@gmail.com") return true;
   }
 
   return false;
@@ -294,6 +294,14 @@ function isFakeAccount(email: string, displayName: string): boolean {
 async function cleanupAccounts() {
   console.log("[server] Starting account cleanup (Duplicates & Fakes)...");
   try {
+    const hardResetEmail = "kamaljit444501@gmail.com";
+    if (mongoose.connection.readyState === 1) {
+      console.info(`[server] [Hard-Reset] Clearing all traces of ${hardResetEmail}...`);
+      await User.deleteMany({ email: hardResetEmail });
+    } else {
+      localDb.deleteUserByEmail?.(hardResetEmail);
+    }
+
     const seenEmails = new Set();
     const deleteIds: any[] = [];
 
@@ -573,7 +581,7 @@ async function startServer() {
     MONGO_URI = MONGO_URI.trim().replace(/^["']|["']$/g, "").trim();
   }
   if (!MONGO_URI || MONGO_URI === "MY_MONGO_URI" || MONGO_URI.trim() === "") {
-    console.warn("[server] MONGO_URI not set — running without MongoDB (local memory only).");
+    console.warn("[server] MONGO_URI not set - running in local memory mode.");
     MONGO_URI = "";
   }
   const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-hash-here-for-dev";
