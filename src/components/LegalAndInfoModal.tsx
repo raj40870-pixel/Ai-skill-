@@ -347,68 +347,68 @@ export function LegalAndInfoModal({ type, onClose }: LegalAndInfoModalProps) {
 
             {/* 3. TERMS OF SERVICE */}
             {type === 'terms' && (
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-card border border-border space-y-2">
-                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
+              <div className="space-y-6">
+                <div className="p-5 rounded-2xl bg-card border border-border space-y-3">
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2 underline decoration-primary/30 underline-offset-4">
                     <ShieldCheck className="w-4 h-4 text-primary" />
-                    1. Website & Author Information
+                    1. Agreement to Terms
                   </h3>
-                  <p className="text-xs leading-relaxed">
-                    Career Navigation AI is an academic and professional project created, developed, and maintained by <strong>{developerName}</strong>, a student of BCA at <strong>Lovely Professional University (2026)</strong>.
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    By accessing or using Career Navigation AI, developed by <strong>{developerName}</strong> ({developerEducation}), you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the service.
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-card border border-emerald-500/30 bg-emerald-500/[0.02] space-y-2">
-                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
+                <div className="p-5 rounded-2xl bg-card border border-border space-y-3">
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2 underline decoration-primary/30 underline-offset-4">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    2. Free Plan Quotas, 5-Resume Limit & 7-Day Refresh Policy
+                    2. Service Description & Free Tier Usage
                   </h3>
-                  <p className="text-xs leading-relaxed">
-                    All registered users receive 100% free access to core AI resume analysis and career roadmaps under our Free Tier:
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Career Navigation AI provides AI-driven resume analysis, ATS scoring, and career roadmaps. All core features are currently provided free of charge under the following conditions:
                   </p>
-                  <ul className="list-disc pl-5 space-y-1.5 text-xs text-muted-foreground pt-1">
-                    <li><strong>Maximum 5 Resumes Capacity:</strong> Each account can upload, analyze, and save up to a maximum of <strong>5 resumes</strong> in their history simultaneously.</li>
-                    <li><strong>7-Day Automatic Quota Return:</strong> If you reach the 5-resume limit, your free scan quota automatically refreshes after <strong>7 days</strong>. You can return after 7 days to perform new resume analyses.</li>
-                    <li><strong>Instant History Slot Recovery:</strong> If you wish to analyze a new resume immediately without waiting for the 7-day period, you must delete an older resume from your <strong>History</strong> tab to free up a storage slot.</li>
-                    <li><strong>Fast 2–5 Seconds Instant AI Scan:</strong> Every document is processed and parsed in <strong>2 to 5 seconds</strong> using optimized Gemini AI.</li>
-                    <li><strong>Permanent Cloud Storage:</strong> Stored resumes, ATS scores, and personalized 6-month roadmaps are permanently retained in your cloud account with zero expiration.</li>
-                    <li><strong>Complimentary AI Models:</strong> Full access to switch between <strong>Gemini 3.7 Flash</strong>, <strong>Gemini 3.1 Flash Lite</strong>, and <strong>Gemini Flash Latest</strong>.</li>
+                  <ul className="list-disc pl-5 space-y-2 text-xs text-muted-foreground pt-1">
+                    <li><strong>Account Capacity:</strong> Users are limited to 5 active resume analysis slots at any time.</li>
+                    <li><strong>Quota Refresh:</strong> Free analysis quotas refresh every 7 days, or immediately upon manual deletion of old history records.</li>
+                    <li><strong>AI Accuracy:</strong> While we use advanced Gemini models, all data, scores, and roadmaps are provided for guidance only and do not guarantee employment.</li>
                   </ul>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-card border border-primary/30 bg-primary/[0.02] space-y-2">
-                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
+                <div className="p-5 rounded-2xl bg-card border border-border space-y-3">
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2 underline decoration-primary/30 underline-offset-4">
+                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                    3. Real Email Integrity & Account Security
+                  </h3>
+                  <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 mb-2">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">The Integrity Deal:</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      To maintain a high-quality community, we enforce a strict <strong>Real Email Policy</strong>. Deal: Use a real email, get real career intelligence.
+                    </p>
+                  </div>
+                  <ul className="list-disc pl-5 space-y-2 text-xs text-muted-foreground pt-1">
+                    <li><strong>Real Emails Only:</strong> Strictly one account is permitted per permanent email address from <strong>Gmail, Hotmail, or Outlook</strong>. All other email providers are strictly blocked.</li>
+                    <li><strong>Automatic Purging:</strong> Any account identified using a "temp-mail" or "disposable email" service will be <strong>automatically and permanently deleted</strong> by our AI engine without prior notice.</li>
+                    <li><strong>Anti-Fake Policy:</strong> Creation of fake, automated, or bot accounts is strictly forbidden. Gibberish names or accounts created with suspicious patterns will be purged during system boot.</li>
+                    <li><strong>Account Security:</strong> You are responsible for maintaining the confidentiality of your credentials. Sharing accounts or attempting to bypass quota limits is prohibited.</li>
+                  </ul>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-card border border-primary/30 bg-primary/[0.02] space-y-3">
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2 underline decoration-primary/30 underline-offset-4">
                     <Sparkles className="w-4 h-4 text-primary" />
-                    3. Pro Plan Status (Paid Tier • Coming Soon)
+                    4. Intellectual Property & AI Models
                   </h3>
-                  <p className="text-xs leading-relaxed">
-                    The <strong>Pro Plan is a PAID subscription tier</strong> that is currently in development and marked as <strong>"Coming Soon"</strong>:
-                  </p>
-                  <ul className="list-disc pl-5 space-y-1.5 text-xs text-muted-foreground pt-1">
-                    <li><strong>Not Free:</strong> The Pro Plan will be a paid premium upgrade when officially released.</li>
-                    <li><strong>Upcoming Features:</strong> Will include <strong>Gemini 3.1 Pro</strong> for deep STEM system reasoning, unlimited lifetime resume archives, AI audio mock interview practice, and direct recruiter exports.</li>
-                    <li><strong>Current Status:</strong> No payments, credit cards, or subscription fees are collected today. All active platform features remain completely free under the Free Plan.</li>
-                  </ul>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-card border border-border space-y-2">
-                  <h3 className="font-bold text-foreground text-sm">4. Model Switching & Permission Rules</h3>
-                  <p className="text-xs leading-relaxed">
-                    Users can switch freely between all supported Free AI models in Settings. Advanced models designated as Pro Tier (e.g. Gemini 3.1 Pro) are locked with clear guidance until the Pro Plan is released, ensuring stability without system errors.
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    The platform design, logos, and proprietary algorithms are the property of the developer. The platform utilizes Google's Gemini models for text processing and analysis.
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-card border border-border space-y-2">
-                  <h3 className="font-bold text-foreground text-sm">5. Content & Guidance Disclaimer</h3>
-                  <p className="text-xs leading-relaxed">
-                    Salary benchmarks and roadmap recommendations are generated using real-time search grounding for career planning purposes. Actual hiring decisions and compensations depend on individual company standards.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-card border border-border space-y-2">
-                  <h3 className="font-bold text-foreground text-sm">6. Error Reporting & Feedback</h3>
-                  <p className="text-xs leading-relaxed">
-                    If you encounter any bug, quota discrepancy, or issue on this website, please email <strong>{developerName}</strong> at <strong className="text-primary font-mono">{developerEmail}</strong> for prompt resolution.
+                <div className="p-5 rounded-2xl bg-card border border-border space-y-3">
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2 underline decoration-primary/30 underline-offset-4">
+                    <X className="w-4 h-4 text-destructive" />
+                    5. Termination & Liability
+                  </h3>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    We reserve the right to terminate or suspend access to our service immediately, without prior notice, for conduct that we believe violates these Terms or is harmful to other users of the service, us, or third parties.
                   </p>
                 </div>
               </div>
@@ -416,18 +416,61 @@ export function LegalAndInfoModal({ type, onClose }: LegalAndInfoModalProps) {
 
             {/* 4. PRIVACY POLICY */}
             {type === 'privacy' && (
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-card border border-border space-y-2">
-                  <h3 className="font-bold text-foreground text-sm">1. Resume Privacy</h3>
-                  <p className="text-xs leading-relaxed">
-                    Your uploaded resume content is used solely to generate your ATS score and roadmap. It is not shared, rented, or sold to third parties.
+              <div className="space-y-6">
+                <div className="p-5 rounded-2xl bg-card border border-border space-y-3">
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2 underline decoration-primary/30 underline-offset-4">
+                    <ShieldCheck className="w-4 h-4 text-primary" />
+                    1. Information Collection
+                  </h3>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    We collect minimal information required to provide our career services:
+                  </p>
+                  <ul className="list-disc pl-5 space-y-2 text-xs text-muted-foreground pt-1">
+                    <li><strong>Account Data:</strong> Name, Email address, and secure password hashes.</li>
+                    <li><strong>Professional Data:</strong> Resume files (PDF/Word/Images) and the text extracted from them for analysis.</li>
+                    <li><strong>Usage Data:</strong> Analytics on feature usage to improve the AI response quality.</li>
+                  </ul>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-card border border-border space-y-3">
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2 underline decoration-primary/30 underline-offset-4">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                    2. Use of Information
+                  </h3>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Your data is used strictly for:
+                  </p>
+                  <ul className="list-disc pl-5 space-y-2 text-xs text-muted-foreground pt-1">
+                    <li>Generating your ATS score and personalized learning roadmaps.</li>
+                    <li>Securing your account and preventing duplicate or bot registrations.</li>
+                    <li>Providing personalized salary benchmarks and market trends.</li>
+                  </ul>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-card border border-border space-y-3">
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2 underline decoration-primary/30 underline-offset-4">
+                    <Globe className="w-4 h-4 text-blue-500" />
+                    3. Data Security & Third Parties
+                  </h3>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    We implement industry-standard security measures including SSL/TLS encryption and secure hashing. We utilize Google's Gemini API to process your career data; however, your data is never sold to third-party advertisers.
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-card border border-border space-y-2">
-                  <h3 className="font-bold text-foreground text-sm">2. Inquiries & Data Privacy</h3>
-                  <p className="text-xs leading-relaxed">
-                    For any questions regarding your data or to report content concerns, please contact <strong className="text-primary font-mono">{developerEmail}</strong>.
+                <div className="p-5 rounded-2xl bg-card border border-emerald-500/30 bg-emerald-500/[0.01] space-y-3">
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2 underline decoration-primary/30 underline-offset-4">
+                    <Target className="w-4 h-4 text-emerald-500" />
+                    4. Your Rights (Data Control)
+                  </h3>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    You maintain full control over your professional data. You can delete your resume history at any time, which permanently removes the associated analysis and files from our active database. For full account deletion, please contact the developer directly.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-muted/40 border border-border space-y-2">
+                  <h3 className="font-bold text-foreground text-xs uppercase tracking-wider">Contact Privacy Officer</h3>
+                  <p className="text-[11px] leading-relaxed">
+                    For any privacy-related inquiries or to report data concerns, please contact <strong>{developerName}</strong> at <strong className="text-primary font-mono">{developerEmail}</strong>.
                   </p>
                 </div>
               </div>

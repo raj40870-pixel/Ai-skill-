@@ -337,14 +337,40 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
       </section>
 
       {/* FOOTER */}
-      <footer className="py-12 border-t border-border/50 text-center text-sm text-muted-foreground">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#7C3AED] to-[#2563EB] flex items-center justify-center shadow-md">
-              <Target className="text-white w-4 h-4" />
+      <footer className="py-12 border-t border-border/50 text-sm text-muted-foreground bg-muted/20">
+        <div className="max-w-6xl mx-auto px-6">
+          {/* System Configuration Display */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-12 mb-12 border-b border-border/40 text-left">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-foreground">Anti-Fake Defense</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">Our AI detects and blocks automated bot registrations in real-time to maintain a real community.</p>
             </div>
-            <span className="font-bold text-foreground tracking-tight">Career Navigation AI</span>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-foreground">Email Integrity</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">Strict email uniqueness is enforced across our entire career ecosystem. No duplicate accounts allowed.</p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-foreground">Auto-Purge Engine</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">A background self-cleaning routine automatically purges duplicate or suspicious accounts on every system boot.</p>
+            </div>
           </div>
+
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#7C3AED] to-[#2563EB] flex items-center justify-center shadow-md">
+                <Target className="text-white w-4 h-4" />
+              </div>
+              <span className="font-bold text-foreground tracking-tight">Career Navigation AI</span>
+            </div>
 
           <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-semibold text-muted-foreground">
             <a 
@@ -395,7 +421,8 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
             Career Navigation building by <strong className="text-foreground">Kamaljit</strong> from BCA, Lovely Professional University, 2026
           </p>
         </div>
-      </footer>
+      </div>
+    </footer>
 
       {/* Legal & Info Modal */}
       <LegalAndInfoModal type={modalType} onClose={() => setModalType(null)} />

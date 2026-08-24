@@ -125,6 +125,14 @@ export function LoginView({ onLogin, onRegister, onResetPassword, onBack }: Logi
                 ? "Enter your email and your new password below" 
                 : (isRegister ? "Start your career roadmap today" : "Sign in to manage your career path")}
             </p>
+            {isRegister && (
+              <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 text-left">
+                <div className="w-4 h-4 rounded-full bg-amber-500 flex-shrink-0 flex items-center justify-center text-[10px] text-white font-black mt-0.5">!</div>
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold leading-relaxed">
+                  IMPORTANT: Only real accounts from <strong>Gmail, Hotmail, and Outlook</strong> are allowed. All other email providers are blocked and fake accounts are purged daily.
+                </p>
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -321,6 +321,9 @@ export default function App() {
     try {
       const res = await mongoApi.register(emailInput, passwordInput, nameInput, user?.uid);
       localStorage.removeItem('careernav_guest_user');
+      if (res.token) {
+        mongoApi.setToken(res.token);
+      }
       setUser(res.user);
       await checkUserResume(res.user.uid, res.user);
       toast.success("Account created successfully!");
@@ -413,79 +416,26 @@ export default function App() {
     }
     const id = toast.loading(`Mapping your career profile & scanning global listings for ${selectedRole}...`);
     try {
-      // 1. Save Resume via MongoDB API
-      console.log(`[App] Saving resume for userId: ${userId}`);
-      const resumeRef = await mongoApi.saveResume(
-        userId, 
-        rData.text, 
-        rData.filename, 
-        pData,
-        selectedRole
+      // Perform the comprehensive Stage 1-5 analysis in a single backend orchestration
+      const result = await geminiService.analyzeCareer(
+        rData.text,
+        rData.filename,
+        selectedRole,
+        selectedRegion,
+        selectedModel
       );
+
+      const { resume, ats, roadmap, market, analysis_id } = result;
       
-      const rawId = resumeRef?.id || resumeRef?._id || `res_${Date.now()}`;
-      const resumeId = (typeof rawId === 'object' && rawId.$oid) ? rawId.$oid : rawId.toString();
-      console.log(`[App] Resume saved. Assigned ID: ${resumeId}`);
-      setResumeData({ ...rData, parsedData: pData, id: resumeId, _id: resumeId });
+      const resumeId = resume.id || resume._id;
+      setResumeData({ ...resume, id: resumeId, _id: resumeId });
       setActiveResumeId(resumeId);
+      setAtsData(ats);
+      setRoadmap(roadmap);
+      setMarketAnalysis(market);
+
       if (userId) {
         localStorage.setItem(`careernav_active_resume_id_${userId}`, resumeId);
-      }
-
-      // 2. Compute ATS specifically on chosen targetRole
-      let ats;
-      try {
-        ats = await geminiService.getATSScore(rData.text, selectedRole, userId);
-      } catch (atsErr: any) {
-        console.error("Auto ATS ranking computation failed, fallback to default", atsErr);
-        ats = FALLBACK_ATS_DATA;
-      }
-      setAtsData(ats);
-      
-      // Save ATS results to MongoDB
-      if (resumeId) {
-        await mongoApi.saveAtsResult(userId, resumeId, ats);
-      }
-
-      // 3. Generate Roadmap specifically on chosen targetRole
-      const currentRole = pData.experience?.[0]?.role || "Software Engineer";
-      const yoe = pData.experience?.[0]?.years || 3;
-      
-      // 4. Compute Live Market Comparison specifically on chosen targetRole & region
-      let market;
-      try {
-        market = await geminiService.getMarketCompare(rData.text, selectedRole, selectedRegion);
-        setMarketAnalysis(market);
-      } catch (compErr) {
-        console.error("Market comparison failed", compErr);
-        market = null;
-      }
-
-      try {
-        const generated = await geminiService.generateRoadmap(
-          pData,
-          currentRole,
-          selectedRole,
-          yoe,
-          userId
-        );
-        setRoadmap(generated);
-        // Save roadmap to MongoDB with market analysis
-        if (resumeId) {
-          await mongoApi.saveRoadmap(userId, resumeId, {
-            ...generated,
-            marketAnalysis: market
-          });
-        }
-      } catch (roadErr) {
-        console.error("Auto roadmap generation failed, fallback to default", roadErr);
-        setRoadmap(FALLBACK_ROADMAP_DATA);
-        if (resumeId) {
-          await mongoApi.saveRoadmap(userId, resumeId, {
-            ...FALLBACK_ROADMAP_DATA,
-            marketAnalysis: market
-          }).catch(dbErr => console.error("Failed to save fallback roadmap to DB:", dbErr));
-        }
       }
 
       setTargetRole(selectedRole);
@@ -493,11 +443,10 @@ export default function App() {
 
       // Award 250 XP on completion of a new upload/analysis!
       const finalXP = (userProfile?.xpPoints || 1250) + 250;
-      const updatedProfile = {
+      setUserProfile({
         ...userProfile,
         xpPoints: finalXP
-      };
-      setUserProfile(updatedProfile);
+      });
 
       // Save XP inside MongoDB User Document
       await mongoApi.saveXP(userId, finalXP, userProfile?.streak || 7);
@@ -509,7 +458,7 @@ export default function App() {
       setPendingParsedData(null);
 
       setAppState('dashboard');
-      setActiveTab('dashboard'); // Redirect straight to main dashboard overview!
+      setActiveTab('dashboard'); 
     } catch (err: any) {
       console.error(err);
       toast.error(`Target career mapping failed: ${err.message || 'Unknown error'}`, { id });
@@ -1070,24 +1019,51 @@ export default function App() {
 
             {/* Professional Footer */}
             <footer className="w-full border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 py-8 px-6 mt-auto">
-              <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-zinc-500 dark:text-zinc-400 text-xs font-medium">
-                <div>
-                  Career Navigation building by <strong className="text-foreground">Kamaljit</strong> from BCA, Lovely Professional University, 2026
+              <div className="max-w-7xl mx-auto space-y-8">
+                {/* System Configuration Display */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-8 border-b border-zinc-200/50 dark:border-zinc-800/30">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-foreground">Anti-Fake Defense</span>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground leading-tight">AI blocks suspicious bot names in real-time.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-foreground">Email Integrity</span>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground leading-tight">Strict email uniqueness enforced across database.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-foreground">Auto-Purge Engine</span>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground leading-tight">Self-cleaning DB removes duplicates on boot.</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-6">
-                  <a 
-                    href="https://github.com/raj40870-pixel" 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="hover:text-primary transition-colors flex items-center gap-1.5 cursor-pointer font-bold"
-                  >
-                    <Github className="w-3.5 h-3.5" />
-                    <span>GitHub</span>
-                  </a>
-                  <button onClick={() => setInfoModalType('privacy')} className="hover:text-primary transition-colors cursor-pointer">Privacy Policy</button>
-                  <button onClick={() => setInfoModalType('terms')} className="hover:text-primary transition-colors cursor-pointer">Terms of Service</button>
-                  <button onClick={() => setInfoModalType('contact')} className="hover:text-primary transition-colors cursor-pointer">Contact</button>
-                  <button onClick={() => setInfoModalType('about')} className="hover:text-primary transition-colors cursor-pointer">About</button>
+
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+                  <div>
+                    Career Navigation building by <strong className="text-foreground">Kamaljit</strong> from BCA, Lovely Professional University, 2026
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <a 
+                      href="https://github.com/raj40870-pixel" 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="hover:text-primary transition-colors flex items-center gap-1.5 cursor-pointer font-bold"
+                    >
+                      <Github className="w-3.5 h-3.5" />
+                      <span>GitHub</span>
+                    </a>
+                    <button onClick={() => setInfoModalType('privacy')} className="hover:text-primary transition-colors cursor-pointer">Privacy Policy</button>
+                    <button onClick={() => setInfoModalType('terms')} className="hover:text-primary transition-colors cursor-pointer">Terms of Service</button>
+                    <button onClick={() => setInfoModalType('contact')} className="hover:text-primary transition-colors cursor-pointer">Contact</button>
+                    <button onClick={() => setInfoModalType('about')} className="hover:text-primary transition-colors cursor-pointer">About</button>
+                  </div>
                 </div>
               </div>
             </footer>
@@ -1171,31 +1147,58 @@ export default function App() {
                </div>
             </main>
             <footer className="w-full border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 py-8 px-6 mt-auto">
-              <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-zinc-500 dark:text-zinc-400 text-xs font-medium">
-                <div>Career Navigation building by <strong className="text-foreground">Kamaljit</strong> from BCA, Lovely Professional University, 2026</div>
-                <div className="flex items-center gap-6">
-                  <a 
-                    href="https://linkedin.com/in/raj-kumar-2254a7371" 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="hover:text-[#0A66C2] transition-colors flex items-center gap-1.5 cursor-pointer font-bold"
-                  >
-                    <Linkedin className="w-3.5 h-3.5" />
-                    <span>LinkedIn</span>
-                  </a>
-                  <a 
-                    href="https://github.com/raj40870-pixel" 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="hover:text-primary transition-colors flex items-center gap-1.5 cursor-pointer font-bold"
-                  >
-                    <Github className="w-3.5 h-3.5" />
-                    <span>GitHub</span>
-                  </a>
-                  <button onClick={() => setInfoModalType('privacy')} className="hover:text-primary transition-colors cursor-pointer">Privacy Policy</button>
-                  <button onClick={() => setInfoModalType('terms')} className="hover:text-primary transition-colors cursor-pointer">Terms of Service</button>
-                  <button onClick={() => setInfoModalType('contact')} className="hover:text-primary transition-colors cursor-pointer">Contact</button>
-                  <button onClick={() => setInfoModalType('about')} className="hover:text-primary transition-colors cursor-pointer">About</button>
+              <div className="max-w-7xl mx-auto space-y-8">
+                {/* System Configuration Display */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-8 border-b border-zinc-200/50 dark:border-zinc-800/30">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-foreground">Anti-Fake Defense</span>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground leading-tight">AI blocks suspicious bot names in real-time.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-foreground">Email Integrity</span>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground leading-tight">Strict email uniqueness enforced across database.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-foreground">Auto-Purge Engine</span>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground leading-tight">Self-cleaning DB removes duplicates on boot.</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+                  <div>Career Navigation building by <strong className="text-foreground">Kamaljit</strong> from BCA, Lovely Professional University, 2026</div>
+                  <div className="flex items-center gap-6">
+                    <a 
+                      href="https://linkedin.com/in/raj-kumar-2254a7371" 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="hover:text-[#0A66C2] transition-colors flex items-center gap-1.5 cursor-pointer font-bold"
+                    >
+                      <Linkedin className="w-3.5 h-3.5" />
+                      <span>LinkedIn</span>
+                    </a>
+                    <a 
+                      href="https://github.com/raj40870-pixel" 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="hover:text-primary transition-colors flex items-center gap-1.5 cursor-pointer font-bold"
+                    >
+                      <Github className="w-3.5 h-3.5" />
+                      <span>GitHub</span>
+                    </a>
+                    <button onClick={() => setInfoModalType('privacy')} className="hover:text-primary transition-colors cursor-pointer">Privacy Policy</button>
+                    <button onClick={() => setInfoModalType('terms')} className="hover:text-primary transition-colors cursor-pointer">Terms of Service</button>
+                    <button onClick={() => setInfoModalType('contact')} className="hover:text-primary transition-colors cursor-pointer">Contact</button>
+                    <button onClick={() => setInfoModalType('about')} className="hover:text-primary transition-colors cursor-pointer">About</button>
+                  </div>
                 </div>
               </div>
             </footer>
