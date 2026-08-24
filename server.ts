@@ -1942,6 +1942,39 @@ async function startServer() {
       }
 
       const cleanEmail = email.trim().toLowerCase();
+
+      // Block fake/temp/disposable email addresses
+      const blockedPatterns = [
+        /^temp_guest_/i,
+        /^test_user_/i,
+        /^fresh_\d+/i,
+        /@careernav\.ai$/i,
+        /@example\.com$/i,
+        /@test\.com$/i,
+        /@mailinator\.com$/i,
+        /@guerrillamail\./i,
+        /@tempmail\./i,
+        /@throwam\.com$/i,
+        /@yopmail\.com$/i,
+        /@sharklasers\.com$/i,
+        /@guerrillamailblock\.com$/i,
+        /@grr\.la$/i,
+        /@spam4\.me$/i,
+        /@trashmail\./i,
+        /@dispostable\.com$/i,
+        /@fakeinbox\.com$/i,
+        /@maildrop\.cc$/i,
+      ];
+      const isBlockedEmail = blockedPatterns.some(pattern => pattern.test(cleanEmail));
+      if (isBlockedEmail) {
+        return res.status(400).json({ error: "Please use a valid email address (e.g. Gmail, Outlook). Temporary or disposable emails are not allowed." });
+      }
+
+      // Basic email format validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+      if (!emailRegex.test(cleanEmail)) {
+        return res.status(400).json({ error: "Please enter a valid email address." });
+      }
       
       let savedUser: any = null;
       let existingUser = null;
