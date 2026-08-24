@@ -573,7 +573,8 @@ async function startServer() {
     MONGO_URI = MONGO_URI.trim().replace(/^["']|["']$/g, "").trim();
   }
   if (!MONGO_URI || MONGO_URI === "MY_MONGO_URI" || MONGO_URI.trim() === "") {
-    MONGO_URI = "mongodb+srv://kamal_jit97:icDRy58aAWt2SXfO@backand.bsgr9fs.mongodb.net/test?appName=backand";
+    console.warn("[server] MONGO_URI not set — running without MongoDB (local memory only).");
+    MONGO_URI = "";
   }
   const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-hash-here-for-dev";
 
