@@ -1,3 +1,5 @@
+const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -59,7 +61,7 @@ export function LearningResourcesTab({ roadmap, onNavigate }: LearningResourcesT
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/generate-learning-resources', {
+      const response = await fetch(`${BASE_URL}/api/generate-learning-resources`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

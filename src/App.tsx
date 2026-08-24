@@ -1,3 +1,5 @@
+const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 import React, { useState, useEffect } from 'react';
 import { mongoApi, MongoUser } from './lib/mongoApi';
 import { ResumeUpload } from './components/ResumeUpload';
@@ -155,7 +157,7 @@ export default function App() {
   const handleFetchSharedRoadmap = async (uid: string) => {
     setIsSharedLoading(true);
     try {
-      const response = await fetch(`/api/users/${uid}/roadmaps`);
+      const response = await fetch(`${BASE_URL}/api/users/${uid}/roadmaps`);
       if (response.ok) {
         const data = await response.json();
         if (data) {

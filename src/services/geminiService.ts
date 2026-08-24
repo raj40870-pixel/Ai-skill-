@@ -1,3 +1,5 @@
+const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 import { mongoApi } from '../lib/mongoApi';
 
 export interface ParsedResume {
@@ -168,7 +170,7 @@ export const geminiService = {
 
   async parseResume(rawText: string, uid?: string): Promise<ParsedResume> {
     const model = getActiveAIModel();
-    const res = await fetch('/api/resume/parse', {
+    const res = await fetch(`${BASE_URL}/api/resume/parse`, {
       method: 'POST',
       headers: mongoApi.getHeaders(),
       body: JSON.stringify({ text: rawText, model, uid })
@@ -182,7 +184,7 @@ export const geminiService = {
 
   async getATSScore(resumeText: string, jobTitle: string = "General", uid?: string): Promise<ATSResult> {
     const model = getActiveAIModel();
-    const res = await fetch('/api/resume/ats', {
+    const res = await fetch(`${BASE_URL}/api/resume/ats`, {
       method: 'POST',
       headers: mongoApi.getHeaders(),
       body: JSON.stringify({ text: resumeText, jobTitle, model, uid })
@@ -196,7 +198,7 @@ export const geminiService = {
 
   async generateRoadmap(parsedResume: ParsedResume, currentRole: string, targetRole: string, yoe: number, uid?: string): Promise<any> {
     const model = getActiveAIModel();
-    const res = await fetch('/api/resume/roadmap', {
+    const res = await fetch(`${BASE_URL}/api/resume/roadmap`, {
       method: 'POST',
       headers: mongoApi.getHeaders(),
       body: JSON.stringify({ parsedResume, currentRole, targetRole, yoe, model, uid })
@@ -215,7 +217,7 @@ export const geminiService = {
     }
 
     const model = getActiveAIModel();
-    const res = await fetch('/api/salary/insights', {
+    const res = await fetch(`${BASE_URL}/api/salary/insights`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ city, track, model })
@@ -237,7 +239,7 @@ export const geminiService = {
     }
 
     const model = getActiveAIModel();
-    const res = await fetch('/api/jobs/matches', {
+    const res = await fetch(`${BASE_URL}/api/jobs/matches`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ skills, targetRole, model })
@@ -259,7 +261,7 @@ export const geminiService = {
     }
 
     const model = getActiveAIModel();
-    const res = await fetch('/api/market/compare', {
+    const res = await fetch(`${BASE_URL}/api/market/compare`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resumeText, targetRole, region, model })
@@ -281,7 +283,7 @@ export const geminiService = {
     }
 
     const model = getActiveAIModel();
-    const res = await fetch('/api/interview/questions', {
+    const res = await fetch(`${BASE_URL}/api/interview/questions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ skills, targetRole, model })
@@ -297,7 +299,7 @@ export const geminiService = {
 
   async evaluateAnswer(question: string, answerText: string): Promise<any> {
     const model = getActiveAIModel();
-    const res = await fetch('/api/interview/evaluate', {
+    const res = await fetch(`${BASE_URL}/api/interview/evaluate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question, answerText, model })

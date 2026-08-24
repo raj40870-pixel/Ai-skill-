@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+
+const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 import { 
   Upload, 
   FileText, 
@@ -128,12 +130,31 @@ export function ResumeUpload({ onSuccess, userId, onNavigate }: ResumeUploadProp
   const [loadingCount, setLoadingCount] = useState(true);
 
   const [parsingStep, setParsingStep] = useState(0);
+  const parsingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const parsingMessages = [
     "Reading document structure...",
     "AI Vision analyzing candidate background...",
     "Extracting skills, experience & education...",
     "Preparing career flight deck..."
   ];
+
+  // Cycle through parsing messages while analysis is running
+  useEffect(() => {
+    if (status === 'uploading' || status === 'parsing') {
+      setParsingStep(0);
+      parsingIntervalRef.current = setInterval(() => {
+        setParsingStep(prev => (prev + 1) % parsingMessages.length);
+      }, 1400);
+    } else {
+      if (parsingIntervalRef.current) {
+        clearInterval(parsingIntervalRef.current);
+        parsingIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (parsingIntervalRef.current) clearInterval(parsingIntervalRef.current);
+    };
+  }, [status]);
 
   // Check current resume count on mount
   useEffect(() => {
@@ -164,7 +185,7 @@ export function ResumeUpload({ onSuccess, userId, onNavigate }: ResumeUploadProp
     async function checkUsage() {
       try {
         setLoadingUsage(true);
-        const res = await fetch(`/api/users/${userId}/usage`);
+        const res = await fetch(`${BASE_URL}/api/users/${userId}/usage`);
         if (res.ok) {
           const data = await res.json();
           setUsage(data);
@@ -225,7 +246,7 @@ export function ResumeUpload({ onSuccess, userId, onNavigate }: ResumeUploadProp
       setStatus('parsing');
 
       // Document Text Extraction & Multimodal AI Vision
-      const res = await fetch('/api/resume/parse-text', {
+      const res = await fetch(`${BASE_URL}/api/resume/parse-text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,3 +1,5 @@
+const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 import React, { useState, useEffect } from 'react';
 import { 
   Settings, 
@@ -59,7 +61,7 @@ export function SettingsTab({ userId, selectedModel = 'gemini-3.7-flash', onMode
         setLoadingUsage(true);
         const [list, statsRes] = await Promise.all([
           mongoApi.getResumes(userId),
-          fetch(`/api/users/${userId}/usage`)
+          fetch(`${BASE_URL}/api/users/${userId}/usage`)
         ]);
         setResumeCount(Array.isArray(list) ? list.length : 0);
         if (statsRes.ok) {
