@@ -566,9 +566,21 @@ async function startServer() {
   const argPort = process.argv.find(arg => /^\d+$/.test(arg));
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : (argPort ? parseInt(argPort) : 3000);
   
-  app.use(cors());
-  app.use(express.json({ limit: '100kb' }));
-  app.use(express.urlencoded({ limit: '100kb', extended: true }));
+  app.use(cors({
+    origin: [
+      'https://carrer-nav-ai.vercel.app',
+      'https://carrer-nav-ai-git-main.vercel.app',
+      /\.vercel\.app$/,
+      /\.run\.app$/,
+      'http://localhost:3000',
+      'http://localhost:5173',
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   app.post("/api/generate-learning-resources", async (req, res) => {
     const { targetRole, skills, skillGaps } = req.body;
