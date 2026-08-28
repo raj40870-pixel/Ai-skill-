@@ -326,6 +326,60 @@ function isFakeAccount(email: string, displayName: string): boolean {
   return false;
 }
 
+async function checkFakeAccountWithAI(email: string, displayName: string): Promise<boolean> {
+  const emailLower = email.toLowerCase().trim();
+  const name = (displayName || "").trim();
+
+  // Whitelist known developer & test accounts to avoid false positives
+  const whitelistedEmails = [
+    "kamaljit444501@gmail.com",
+    "kamaljitlpu27@gmail.com",
+    "princekumar64271@gmail.com",
+    "k69117842@gmail.com",
+    "raj40870@gmail.com"
+  ];
+  if (whitelistedEmails.includes(emailLower)) {
+    return false;
+  }
+
+  // Fast local check: Domain must be one of the standard personal email providers
+  const allowedDomains = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com'];
+  const domain = emailLower.split('@')[1];
+  if (!domain || !allowedDomains.includes(domain)) {
+    return true; // Block foreign or temporary domains
+  }
+
+  try {
+    const prompt = `
+      Analyze this user registration metadata and determine if it represents a fake account, a bot, a temporary spam email, or a dummy registration (e.g. random letters, gibberish strings, fake name patterns like test, abc, 123).
+      
+      Email: "${emailLower}"
+      Display Name: "${name}"
+      
+      Return a valid JSON object:
+      {
+        "isFake": boolean,
+        "reason": string
+      }
+    `;
+
+    const response = await generateContentReliably({
+      model: "gemini-3.5-flash-lite", // Lightweight model for speed
+      contents: prompt,
+      config: { responseMimeType: "application/json" },
+      timeoutMs: 4000
+    });
+
+    const parsed = JSON.parse(cleanJSONResponse(response.text || "{}"));
+    return !!parsed.isFake;
+  } catch (err) {
+    console.warn("[server] [AI-Defense] AI check failed or timed out. Falling back to local rules.", err);
+    const fakeKeywords = ["test", "dummy", "fake", "temp", "spam", "bot", "asdf", "qwerty", "1234"];
+    const username = emailLower.split('@')[0];
+    return fakeKeywords.some(kw => username.includes(kw) || name.toLowerCase().includes(kw));
+  }
+}
+
 async function cleanupAccounts() {
   console.log("[server] Starting account cleanup (Duplicates & Fakes)...");
   try {
@@ -343,8 +397,11 @@ async function cleanupAccounts() {
           continue;
         }
 
+        const isFakeLocal = isFakeAccount(email, displayName);
+        const isFakeAI = await checkFakeAccountWithAI(email, displayName);
+
         // Check for duplicates OR fake patterns
-        if (seenEmails.has(email) || isFakeAccount(email, displayName)) {
+        if (seenEmails.has(email) || isFakeLocal || isFakeAI) {
           deleteIds.push(user._id);
         } else {
           seenEmails.add(email);
@@ -373,7 +430,10 @@ async function cleanupAccounts() {
           const email = u.email ? u.email.toLowerCase().trim() : null;
           const displayName = u.displayName || "";
           
-          if (!email || localSeen.has(email) || isFakeAccount(email, displayName)) {
+          const isFakeLocal = isFakeAccount(email || "", displayName);
+          const isFakeAI = await checkFakeAccountWithAI(email || "", displayName);
+
+          if (!email || localSeen.has(email) || isFakeLocal || isFakeAI) {
             deleted++;
           } else {
             localSeen.add(email);
@@ -804,10 +864,12 @@ async function startServer() {
 
       const cleanEmail = email.trim().toLowerCase();
       
-      // Strict Real Email Check for Login
-      if (isFakeAccount(cleanEmail, "Existing User")) {
-        console.warn(`[auth] Login blocked for non-compliant email: ${cleanEmail}`);
-        return res.status(403).json({ error: "You can use our real email." });
+      // Strict Real Email Check for Login (Local Rules + AI Check)
+      const isFakeLocal = isFakeAccount(cleanEmail, "Existing User");
+      const isFakeAI = await checkFakeAccountWithAI(cleanEmail, "Existing User");
+      if (isFakeLocal || isFakeAI) {
+        console.warn(`[auth] Login blocked for non-compliant/fake email: ${cleanEmail}`);
+        return res.status(403).json({ error: "Your account is blocked, you can use a valid email, otherwise Next hour account is blocked" });
       }
 
       let userDoc: any = null;
@@ -2576,7 +2638,9 @@ Cloud Platform Service | Tech: React, Node.js, MongoDB`;
         const allUsers = await User.find({});
         let purgedCount = 0;
         for (const u of allUsers) {
-          if (isFakeAccount(u.email, u.displayName)) {
+          const isFakeLocal = isFakeAccount(u.email, u.displayName);
+          const isFakeAI = await checkFakeAccountWithAI(u.email, u.displayName);
+          if (isFakeLocal || isFakeAI) {
             console.warn(`[system] [Auto-Purge] Deleting fake account: ${u.email}`);
             await User.deleteOne({ _id: u._id });
             await Resume.deleteMany({ userId: u.uid });
@@ -2590,7 +2654,9 @@ Cloud Platform Service | Tech: React, Node.js, MongoDB`;
         const allUsers = localDb.getAllUsers();
         let purgedCount = 0;
         for (const u of allUsers) {
-          if (isFakeAccount(u.email, u.displayName)) {
+          const isFakeLocal = isFakeAccount(u.email, u.displayName);
+          const isFakeAI = await checkFakeAccountWithAI(u.email, u.displayName);
+          if (isFakeLocal || isFakeAI) {
             console.warn(`[system] [Auto-Purge] Deleting fake account from localDB: ${u.email}`);
             localDb.deleteUser(u.uid);
             purgedCount++;
