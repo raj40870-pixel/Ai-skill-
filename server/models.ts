@@ -15,6 +15,10 @@ const UserSchema = new mongoose.Schema({
     windowStartDate: { type: Date, default: Date.now }
   },
   createdAt: { type: Date, default: Date.now },
+  emailVerified: { type: Boolean, default: false },
+  otp: { type: String }, // Hashed OTP
+  otpExpires: { type: Date },
+  otpResendCount: { type: Number, default: 0 },
   preferences: {
     fullname: { type: String, default: '' },
     targetRole: { type: String, default: '' },
@@ -36,6 +40,7 @@ const ResumeSchema = new mongoose.Schema({
   userId: { type: String, required: true, index: true },
   text: { type: String, required: true },
   filename: { type: String, required: true },
+  contentHash: { type: String, index: true },
   targetRole: { type: String, default: 'Full Stack Developer' },
   parsedData: { type: mongoose.Schema.Types.Mixed, default: {} },
   createdAt: { type: Date, default: Date.now }
@@ -54,7 +59,6 @@ const AtsResultSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-// Roadmap Schema
 const RoadmapSchema = new mongoose.Schema({
   userId: { type: String, required: true, index: true },
   resumeId: { type: String, required: true },
@@ -63,6 +67,8 @@ const RoadmapSchema = new mongoose.Schema({
   salary_projection: { type: mongoose.Schema.Types.Mixed, default: {} },
   skill_gap_report: { type: mongoose.Schema.Types.Mixed, default: {} },
   marketAnalysis: { type: mongoose.Schema.Types.Mixed, default: {} },
+  learning_resources: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  expertTip: { type: String },
   createdAt: { type: Date, default: Date.now }
 });
 

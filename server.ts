@@ -546,15 +546,20 @@ async function generateLiveLearningResources(targetRole: string, skills: string[
               "title": "Specific resource name",
               "description": "Short, high-value description of what they will learn.",
               "url": "https://direct-link-to-material.com",
-              "type": "documentation" | "course" | "github" | "tutorial",
-              "difficulty": "Beginner" | "Intermediate" | "Advanced",
-              "estimatedTime": "e.g. 10 hours"
+              "type": "documentation",
+              "difficulty": "Beginner",
+              "estimatedTime": "10 hours"
             }
           ]
         }
       ],
       "expertTip": "A deep professional tip on how to master these specific gaps efficiently."
     }
+
+    Important rules for JSON formatting:
+    - The "type" field must be a string containing exactly one of: "documentation", "course", "github", or "tutorial".
+    - The "difficulty" field must be a string containing exactly one of: "Beginner", "Intermediate", or "Advanced".
+    - Do not include comments, trailing commas, or any characters outside the JSON structure.
 
     Focus on quality over quantity. Provide 3-4 categories with 2-3 specific resources each.
     Ensure URLs are standard, high-authority domains (e.g., pytorch.org, scikit-learn.org, realpython.com, etc.).

@@ -1,5 +1,3 @@
-const BASE_URL = (import.meta.env.VITE_API_URL || 'https://ais-pre-zzgehztczlcl5evoujectb-435432813811.asia-southeast1.run.app').replace(/\/$/, '');
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -61,7 +59,7 @@ export function LearningResourcesTab({ roadmap, onNavigate }: LearningResourcesT
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${BASE_URL}/api/generate-learning-resources`, {
+      const response = await fetch('/api/generate-learning-resources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -82,8 +80,15 @@ export function LearningResourcesTab({ roadmap, onNavigate }: LearningResourcesT
   };
 
   useEffect(() => {
-    if (roadmap && !data && !isLoading) {
-      fetchResources();
+    if (roadmap) {
+      if (roadmap.learning_resources && roadmap.learning_resources.length > 0) {
+        setData({
+          categories: roadmap.learning_resources,
+          expertTip: roadmap.expertTip || roadmap.expert_tip || "Focus on building end-to-end projects to bridge your skill gaps effectively."
+        });
+      } else if (!data && !isLoading) {
+        fetchResources();
+      }
     }
   }, [roadmap]);
 
