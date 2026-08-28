@@ -113,6 +113,7 @@ async function generateContentReliably(options: {
   }
 
   let lastError: any = null;
+  let hitQuotaError = false;
 
   for (const currentModel of modelsToTry) {
     try {
@@ -140,15 +141,18 @@ async function generateContentReliably(options: {
       console.warn(`[server] [AI Attempt Failed] Model ${currentModel} failed: ${error?.message || errorStr}`);
 
       if (isQuotaError) {
-        console.warn(`[server] Gemini API quota limit reached (429). Activating fast-fail circuit breaker for 60 seconds.`);
-        quotaCircuitBreakerUntil = Date.now() + 60000;
-        throw error; // If it's a quota error, don't try other models since the API key itself is blocked
+        hitQuotaError = true;
       }
 
       if (isPermissionError && errorStr.includes("identity")) {
         throw error; // If key is invalid or unregistered caller, fail immediately
       }
     }
+  }
+
+  if (hitQuotaError) {
+    console.warn(`[server] All models exhausted and quota limit reached (429). Activating fast-fail circuit breaker for 60 seconds.`);
+    quotaCircuitBreakerUntil = Date.now() + 60000;
   }
 
   throw lastError;
