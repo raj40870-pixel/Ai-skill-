@@ -273,7 +273,7 @@ async function checkHistoryLimit(uid: string) {
 async function checkModelAccess(uid: string, modelId: string) {
   if (!modelId) return true;
   
-  const proModels = ["gemini-1.5-pro", "gemini-3.1-pro-preview"];
+  const proModels = ["gemini-1.5-pro", "gemini-3.1-pro-preview", "gemini-2.0-pro"];
   const isProModel = proModels.includes(modelId);
   
   if (!isProModel) return true;
@@ -2515,6 +2515,22 @@ Cloud Platform Service | Tech: React, Node.js, MongoDB`;
           bestFor: "Multi-year executive engineering pathing, architectural reviews, and deep code critiques.",
           dailyFreeLimit: "Cloud Standard",
           rpmLimit: "Standard",
+          status: "operational"
+        },
+        {
+          id: "gemini-2.0-pro",
+          name: "Gemini 2.0 Pro",
+          alias: "gemini-2.0-pro",
+          provider: "Google Cloud / AI Studio",
+          tier: "pro",
+          tierLabel: "Premium Deep Reasoning",
+          badge: "Premium Locked",
+          speed: "🧠 Deep Reasoning (~900ms)",
+          speedRating: 3,
+          description: "Legacy Gemini 2.0 Pro engine specialized for coding, complex logical analysis, and legacy enterprise software architectures.",
+          bestFor: "Full Stack engineering pathing, premium system designs, and legacy code audit reviews.",
+          dailyFreeLimit: "Premium Plan",
+          rpmLimit: "Premium Plan",
           status: "operational"
         }
       ]
