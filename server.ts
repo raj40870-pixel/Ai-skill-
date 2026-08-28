@@ -2040,7 +2040,16 @@ async function startServer() {
             "regionalInsights": string
           },
           "gapAnalysis": {
-            "missingSkills": [{skill, priority, reason, marketTrend, improvement}],
+            "missing_skills": [
+              {
+                "skill": string,
+                "category": "Technical Skill" | "Framework" | "Tool" | "Project" | "Experience" | "Certification" | "Soft Skill",
+                "priority": "High" | "Medium" | "Low",
+                "reason": string,
+                "market_demand_trend": string,
+                "suggested_improvement": string
+              }
+            ],
             "weakPoints": [{gap, details, fix}]
           }
         }
@@ -2059,7 +2068,7 @@ async function startServer() {
       
       const stage5Prompt = `
         Generate a 6-month specialized "Career Flight Path" to become a top-tier "${role}".
-        Base this on the identified gaps: ${JSON.stringify(stage34Data.gapAnalysis.missingSkills)}.
+        Base this on the identified gaps: ${JSON.stringify(stage34Data.gapAnalysis.missing_skills)}.
         
         Return a valid JSON object for a Roadmap:
         {
