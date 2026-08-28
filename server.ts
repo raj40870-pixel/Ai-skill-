@@ -2096,7 +2096,19 @@ async function startServer() {
             }
           ],
           "learning_resources": [
-            { "skill_or_topic": string, "official_documentation": string, "free_youtube_courses": string, "practice_websites": string, "project_ideas": string, "certification_recommendation": string }
+            {
+              "name": string,
+              "resources": [
+                {
+                  "title": string,
+                  "description": string,
+                  "url": string,
+                  "type": "documentation" | "course" | "github" | "tutorial",
+                  "difficulty": "Beginner" | "Intermediate" | "Advanced",
+                  "estimatedTime": string
+                }
+              ]
+            }
           ]
         }
       `;

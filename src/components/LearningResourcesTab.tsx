@@ -82,8 +82,59 @@ export function LearningResourcesTab({ roadmap, onNavigate }: LearningResourcesT
   useEffect(() => {
     if (roadmap) {
       if (roadmap.learning_resources && roadmap.learning_resources.length > 0) {
+        // Detect if it is Structure A (old format with skill_or_topic)
+        const firstItem = roadmap.learning_resources[0];
+        const isOldFormat = firstItem && ('skill_or_topic' in firstItem || 'official_documentation' in firstItem);
+        
+        let mappedCategories = [];
+        if (isOldFormat) {
+          mappedCategories = roadmap.learning_resources.map((item: any) => {
+            const resources = [];
+            if (item.official_documentation) {
+              resources.push({
+                title: `${item.skill_or_topic || "Official"} Documentation`,
+                description: "Deep dive into the official reference guides and manuals.",
+                url: item.official_documentation,
+                type: 'documentation',
+                difficulty: 'Intermediate',
+                estimatedTime: 'Ongoing'
+              });
+            }
+            if (item.practice_websites) {
+              resources.push({
+                title: "Practice & Learning Platforms",
+                description: "Hands-on practice exercises and challenges.",
+                url: item.practice_websites,
+                type: 'tutorial',
+                difficulty: 'Beginner',
+                estimatedTime: '5 hours'
+              });
+            }
+            if (item.free_youtube_courses) {
+              resources.push({
+                title: "Recommended Video Content",
+                description: `Free YouTube course/channel: ${item.free_youtube_courses}`,
+                url: "https://www.youtube.com",
+                type: 'course',
+                difficulty: 'Beginner',
+                estimatedTime: '10 hours'
+              });
+            }
+            return {
+              name: item.skill_or_topic || "Resources",
+              resources: resources
+            };
+          });
+        } else {
+          // If it is already in the new format, check and filter to make sure categories and resources are safe
+          mappedCategories = roadmap.learning_resources.map((cat: any) => ({
+            name: cat.name || cat.category || "Resources",
+            resources: Array.isArray(cat.resources) ? cat.resources : []
+          }));
+        }
+
         setData({
-          categories: roadmap.learning_resources,
+          categories: mappedCategories,
           expertTip: roadmap.expertTip || roadmap.expert_tip || "Focus on building end-to-end projects to bridge your skill gaps effectively."
         });
       } else if (!data && !isLoading) {
