@@ -19,6 +19,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { mongoApi } from '../lib/mongoApi';
 
 interface Resource {
   title: string;
@@ -59,7 +60,7 @@ export function LearningResourcesTab({ roadmap, onNavigate }: LearningResourcesT
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/generate-learning-resources', {
+      const response = await fetch(`${mongoApi.getBaseUrl()}/api/generate-learning-resources`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
