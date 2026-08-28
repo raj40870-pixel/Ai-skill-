@@ -11,6 +11,7 @@ export interface MongoUser {
 
 class MongoApiService {
   private tokenKey = 'careernav_jwt_token';
+  // @ts-ignore
   private baseUrl = import.meta.env.VITE_API_URL || '';
 
   getBaseUrl(): string {
