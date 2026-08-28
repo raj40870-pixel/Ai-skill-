@@ -68,7 +68,7 @@ function getAI(forceBackup: boolean = false): GoogleGenAI {
   }
 
   if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.trim() === "") {
-    throw new Error("GEMINI_API_KEY environment variable is not set.");
+    console.error("[server] [AI] Error: GEMINI_API_KEY is not configured.");
   }
 
   if (!aiClient || aiClientKey !== apiKey) {
@@ -91,8 +91,10 @@ async function generateContentReliably(options: {
   model: string;
   contents: any;
   config?: any;
+  timeoutMs?: number;
 }): Promise<any> {
   const primaryModel = options.model || "gemini-3.7-flash";
+  const timeoutMs = options.timeoutMs || 25000;
   const now = Date.now();
   
   // If we recently hit a hard quota limit (429), fast-fail immediately without blocking user UI with network timeouts
@@ -102,27 +104,54 @@ async function generateContentReliably(options: {
     throw new Error(`API quota exceeded. Failover circuit breaker active (${remainingSec}s cooldown).`);
   }
 
-  try {
-    const client = getAI(false);
-    return await client.models.generateContent({
-      ...options,
-      model: primaryModel,
-    });
-  } catch (error: any) {
-    const errorStr = (typeof error === 'object' ? JSON.stringify(error) : String(error)) || "";
-    const isQuotaError = errorStr.includes("RESOURCE_EXHAUSTED") || 
-                         errorStr.includes("quota") || 
-                         errorStr.includes("429");
-    
-    if (isQuotaError) {
-      console.warn(`[server] Gemini API quota limit reached (429). Activating fast-fail circuit breaker for 60 seconds.`);
-      quotaCircuitBreakerUntil = Date.now() + 60000;
-    } else {
-      console.warn(`[server] AI generation with model ${primaryModel} failed: ${error?.message || error}`);
-    }
-
-    throw error;
+  const modelsToTry = [primaryModel];
+  if (primaryModel === "gemini-3.7-flash") {
+    modelsToTry.push("gemini-3.6-flash");
+    modelsToTry.push("gemini-3.5-flash");
+    modelsToTry.push("gemini-3.5-flash-lite");
+    modelsToTry.push("gemini-3.1-flash-lite");
   }
+
+  let lastError: any = null;
+
+  for (const currentModel of modelsToTry) {
+    try {
+      console.log(`[server] [AI Attempt] Requesting content generation with model: ${currentModel} (timeout: ${timeoutMs}ms)`);
+      const client = getAI(false);
+      
+      const apiCall = client.models.generateContent({
+        ...options,
+        model: currentModel,
+      });
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`AI Request Timeout after ${Math.round(timeoutMs / 1000)} seconds`)), timeoutMs)
+      );
+
+      return await Promise.race([apiCall, timeoutPromise]);
+    } catch (error: any) {
+      lastError = error;
+      const errorStr = (typeof error === 'object' ? JSON.stringify(error) : String(error)) || "";
+      const isQuotaError = errorStr.includes("RESOURCE_EXHAUSTED") || 
+                           errorStr.includes("quota") || 
+                           errorStr.includes("429");
+      const isPermissionError = errorStr.includes("PERMISSION_DENIED") || errorStr.includes("403");
+      
+      console.warn(`[server] [AI Attempt Failed] Model ${currentModel} failed: ${error?.message || errorStr}`);
+
+      if (isQuotaError) {
+        console.warn(`[server] Gemini API quota limit reached (429). Activating fast-fail circuit breaker for 60 seconds.`);
+        quotaCircuitBreakerUntil = Date.now() + 60000;
+        throw error; // If it's a quota error, don't try other models since the API key itself is blocked
+      }
+
+      if (isPermissionError && errorStr.includes("identity")) {
+        throw error; // If key is invalid or unregistered caller, fail immediately
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 // --- USAGE TRACKING HELPERS ---
@@ -190,6 +219,8 @@ async function checkAndIncrementUsage(uid: string, shouldIncrement: boolean = tr
   const resetDate = new Date(windowStart.getTime() + 7 * 24 * 3600 * 1000);
   return { allowed: true, remaining: 3 - (usage.analysisCount || 0), resetDate };
 }
+
+
 
 function cleanJSONResponse(text: string): string {
   if (!text) return "{}";
@@ -264,7 +295,7 @@ function isFakeAccount(email: string, displayName: string): boolean {
   
   if (!isAllowedDomain) {
     // Permanent whitelist for developer/test accounts
-    const whitelistedEmails = ["k69117842@gmail.com", "raj40870@gmail.com", "kamaljit444501@gmail.com"];
+    const whitelistedEmails = ["k69117842@gmail.com", "raj40870@gmail.com"];
     if (!whitelistedEmails.includes(emailLower)) return true;
   }
 
@@ -285,7 +316,7 @@ function isFakeAccount(email: string, displayName: string): boolean {
   // 5. Excessive numbers (Bot-like naming)
   const digitCount = (s: string) => (s.match(/\d/g) || []).length;
   if (localPart.length < 15 && digitCount(localPart) > localPart.length * 0.75) {
-    if (emailLower !== "k69117842@gmail.com" && emailLower !== "raj40870@gmail.com" && emailLower !== "kamaljit444501@gmail.com") return true;
+    if (emailLower !== "k69117842@gmail.com" && emailLower !== "raj40870@gmail.com") return true;
   }
 
   return false;
@@ -294,14 +325,6 @@ function isFakeAccount(email: string, displayName: string): boolean {
 async function cleanupAccounts() {
   console.log("[server] Starting account cleanup (Duplicates & Fakes)...");
   try {
-    const hardResetEmail = "kamaljit444501@gmail.com";
-    if (mongoose.connection.readyState === 1) {
-      console.info(`[server] [Hard-Reset] Clearing all traces of ${hardResetEmail}...`);
-      await User.deleteMany({ email: hardResetEmail });
-    } else {
-      localDb.deleteUserByEmail?.(hardResetEmail);
-    }
-
     const seenEmails = new Set();
     const deleteIds: any[] = [];
 
@@ -566,19 +589,7 @@ async function startServer() {
   const argPort = process.argv.find(arg => /^\d+$/.test(arg));
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : (argPort ? parseInt(argPort) : 3000);
   
-  app.use(cors({
-    origin: [
-      'https://carrer-nav-ai.vercel.app',
-      'https://carrer-nav-ai-git-main.vercel.app',
-      /\.vercel\.app$/,
-      /\.run\.app$/,
-      'http://localhost:3000',
-      'http://localhost:5173',
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  }));
+  app.use(cors());
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -593,10 +604,9 @@ async function startServer() {
     MONGO_URI = MONGO_URI.trim().replace(/^["']|["']$/g, "").trim();
   }
   if (!MONGO_URI || MONGO_URI === "MY_MONGO_URI" || MONGO_URI.trim() === "") {
-    console.warn("[server] MONGO_URI not set - running in local memory mode.");
-    MONGO_URI = "";
+    MONGO_URI = "mongodb+srv://kamal_jit97:icDRy58aAWt2SXfO@backand.bsgr9fs.mongodb.net/test?appName=backand";
   }
-  const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-hash-here-for-dev";
+  const JWT_SECRET = process.env.JWT_SECRET || "careernav-stable-jwt-secret-2026-do-not-change";
 
   const isMongoConnected = () => {
     return mongoose.connection.readyState === 1;
@@ -646,16 +656,13 @@ async function startServer() {
       const now = new Date();
       const plan = user.plan || 'FREE';
       
-      // Default usage if none exists
       const usage = user.usage || { analysisCount: 0, windowStartDate: now.toISOString() };
       let windowStart = new Date(usage.windowStartDate);
       
-      // Safety check for invalid dates
       if (isNaN(windowStart.getTime())) {
         windowStart = now;
       }
       
-      // Check if window needs reset (7 days)
       const diffDays = (now.getTime() - windowStart.getTime()) / (1000 * 3600 * 24);
       let currentCount = usage.analysisCount;
       let effectiveWindowStart = windowStart;
@@ -663,8 +670,6 @@ async function startServer() {
       if (diffDays >= 7) {
         currentCount = 0;
         effectiveWindowStart = now;
-        // We don't save here to avoid unnecessary DB writes on every GET, 
-        // but we return the "fresh" state to the user.
       }
 
       const limit = plan === 'PREMIUM' ? Infinity : 3;
@@ -760,7 +765,7 @@ async function startServer() {
         }
 
       const finalUid = savedUser.uid || savedUser._id;
-      const token = jwt.sign({ uid: finalUid, email: savedUser.email }, JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign({ uid: finalUid, email: savedUser.email }, JWT_SECRET, { expiresIn: '30d' });
       res.status(201).json({
         token,
         user: {
@@ -877,7 +882,7 @@ async function startServer() {
         }
       }
 
-      const token = jwt.sign({ uid: userDoc.uid, email: userDoc.email }, JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign({ uid: userDoc.uid, email: userDoc.email }, JWT_SECRET, { expiresIn: '30d' });
       res.json({
         token,
         user: {
@@ -957,7 +962,7 @@ async function startServer() {
       }
       console.info(`[auth] Reset-password: Password updated successfully for ${cleanEmail}`);
 
-      const token = jwt.sign({ uid: userDoc.uid, email: userDoc.email }, JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign({ uid: userDoc.uid, email: userDoc.email }, JWT_SECRET, { expiresIn: '30d' });
       res.json({
         message: "Password updated successfully. Please login with your new password.",
         token,
@@ -1480,7 +1485,7 @@ async function startServer() {
       if (!text) return res.status(400).json({ error: "Missing text to parse" });
 
       if (uid) {
-        const usageCheck = await checkAndIncrementUsage(uid);
+        const usageCheck = await checkAndIncrementUsage(uid, false); // Check only
         if (!usageCheck.allowed) {
           return res.status(403).json({ 
             error: "Weekly limit reached", 
@@ -1511,6 +1516,11 @@ async function startServer() {
             responseMimeType: "application/json",
           },
         });
+
+        // Deduct credit only on successful completion
+        if (uid) {
+          await checkAndIncrementUsage(uid, true);
+        }
 
         res.json(JSON.parse(cleanJSONResponse(response.text || "{}")));
       } catch (aiError: any) {
@@ -1924,10 +1934,25 @@ async function startServer() {
   });
 
   // --- COMPREHENSIVE CAREER ANALYSIS PIPELINE (STAGES 1-5) ---
-  app.post("/api/career/analyze", authenticateToken, requireVerification, async (req: any, res) => {
+  app.post("/api/career/analyze", async (req: any, res) => {
     try {
       const { text, filename, targetRole, region, model } = req.body;
-      const uid = req.user.uid;
+      let uid = req.body.uid;
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET) as any;
+          if (decoded && decoded.uid) {
+            uid = decoded.uid;
+          }
+        } catch (e: any) {
+          console.warn("[server] [Analysis] Optional JWT verification failed:", e.message);
+        }
+      }
+      if (!uid) {
+        uid = `guest_${Date.now()}`;
+      }
 
       if (!text) return res.status(400).json({ error: "Missing resume text" });
       const role = targetRole || "Software Engineer";
@@ -1965,8 +1990,6 @@ async function startServer() {
 
       // 1. Contextual Indexing & Target-Role Projection (Stages 1 & 2)
       console.log(`[server] [Analysis] [Stage 1] Extracting Structural Metadata...`);
-      await new Promise(r => setTimeout(r, 2000));
-      
       console.log(`[server] [Analysis] [Stage 2] Indexing Skills & Project Clusters...`);
       const stage12Prompt = `
         Perform a deep technical analysis of this resume for the target role: "${role}".
@@ -2001,8 +2024,6 @@ async function startServer() {
 
       // 2. Market Data Synthesis & Structural Gap Analysis (Stages 3 & 4)
       console.log(`[server] [Analysis] [Stage 3] Scouring 2026 Live Market Benchmarks for ${role}...`);
-      await new Promise(r => setTimeout(r, 2500));
-      
       console.log(`[server] [Analysis] [Stage 4] Synchronizing Structural Gap Analysis...`);
       const stage34Prompt = `
         As a Career Intelligence AI, conduct Market Research for a "${role}" in "${targetRegion}".
@@ -2034,7 +2055,6 @@ async function startServer() {
 
       // 3. Final Career Mapping (Stage 5)
       console.log(`[server] [Analysis] [Stage 5] Synthesizing Final Career Roadmap...`);
-      await new Promise(r => setTimeout(r, 1500));
       console.log(`[server] [Analysis] [Stage 5] Finalizing Index 5 = SUCCESS.`);
       
       const stage5Prompt = `
