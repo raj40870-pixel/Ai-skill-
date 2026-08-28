@@ -1,5 +1,3 @@
-const BASE_URL = (import.meta.env.VITE_API_URL || 'https://ais-pre-zzgehztczlcl5evoujectb-435432813811.asia-southeast1.run.app').replace(/\/$/, '');
-
 export interface MongoUser {
   uid: string;
   email: string;
@@ -13,9 +11,10 @@ export interface MongoUser {
 
 class MongoApiService {
   private tokenKey = 'careernav_jwt_token';
+  private baseUrl = import.meta.env.VITE_API_URL || '';
 
-  private isValidUid(uid: string): boolean {
-    return !!uid && uid !== 'undefined' && uid !== 'null' && uid.trim() !== '';
+  getBaseUrl(): string {
+    return this.baseUrl;
   }
 
   setToken(token: string) {
@@ -24,6 +23,45 @@ class MongoApiService {
 
   getToken(): string | null {
     return localStorage.getItem(this.tokenKey);
+  }
+
+  async sendOtp(): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/api/auth/send-otp`, {
+      method: 'POST',
+      headers: this.getHeaders()
+    });
+    
+    let data;
+    try {
+      data = await response.json();
+    } catch (e) {
+      throw new Error(`Server error (${response.status})`);
+    }
+
+    if (!response.ok) throw new Error(data.error || 'Failed to send OTP');
+    return data;
+  }
+
+  async verifyOtp(otp: string): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/api/auth/verify-otp`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ otp })
+    });
+    
+    let data;
+    try {
+      data = await response.json();
+    } catch (e) {
+      throw new Error(`Server error (${response.status})`);
+    }
+
+    if (!response.ok) throw new Error(data.error || 'Invalid verification code');
+    return data;
+  }
+
+  private isValidUid(uid: string): boolean {
+    return !!uid && uid !== 'undefined' && uid !== 'null' && uid.trim() !== '';
   }
 
   clearToken() {
@@ -42,7 +80,7 @@ class MongoApiService {
   }
 
   async register(email: string, password: string, displayName?: string, tempUid?: string): Promise<{ token: string; user: MongoUser }> {
-    const response = await fetch(`${BASE_URL}/api/auth/register`, {
+    const response = await fetch(`${this.baseUrl}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, displayName, tempUid })
@@ -71,7 +109,7 @@ class MongoApiService {
   }
 
   async login(email: string, password: string, tempUid?: string): Promise<{ token: string; user: MongoUser }> {
-    const response = await fetch(`${BASE_URL}/api/auth/login`, {
+    const response = await fetch(`${this.baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, tempUid })
@@ -100,7 +138,7 @@ class MongoApiService {
   }
 
   async resetPassword(email: string, password: string, displayName: string): Promise<any> {
-    const response = await fetch(`${BASE_URL}/api/auth/reset-password`, {
+    const response = await fetch(`${this.baseUrl}/api/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, displayName })
@@ -135,7 +173,7 @@ class MongoApiService {
     if (!token) return null;
 
     try {
-      const response = await fetch(`${BASE_URL}/api/auth/me`, {
+      const response = await fetch(`${this.baseUrl}/api/auth/me`, {
         headers: this.getHeaders()
       });
       if (!response.ok) {
@@ -152,7 +190,7 @@ class MongoApiService {
 
   async updateAvatar(uid: string, photoURL: string): Promise<string> {
     if (!this.isValidUid(uid)) return photoURL;
-    const response = await fetch(`${BASE_URL}/api/users/${uid}/avatar`, {
+    const response = await fetch(`${this.baseUrl}/api/users/${uid}/avatar`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ photoURL })
@@ -165,7 +203,7 @@ class MongoApiService {
   async getPreferences(uid: string): Promise<any> {
     if (!this.isValidUid(uid)) return {};
     try {
-      const response = await fetch(`${BASE_URL}/api/users/${uid}/profile/preferences`, {
+      const response = await fetch(`${this.baseUrl}/api/users/${uid}/profile/preferences`, {
         headers: this.getHeaders()
       });
       if (!response.ok) {
@@ -182,7 +220,7 @@ class MongoApiService {
 
   async savePreferences(uid: string, preferences: any): Promise<any> {
     if (!this.isValidUid(uid)) return preferences;
-    const response = await fetch(`${BASE_URL}/api/users/${uid}/profile/preferences`, {
+    const response = await fetch(`${this.baseUrl}/api/users/${uid}/profile/preferences`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(preferences)
@@ -195,7 +233,7 @@ class MongoApiService {
   async saveXP(uid: string, xpPoints: number, streak: number): Promise<{ xpPoints: number; streak: number }> {
     if (!this.isValidUid(uid)) return { xpPoints, streak };
     try {
-      const response = await fetch(`${BASE_URL}/api/users/${uid}/profile/xp`, {
+      const response = await fetch(`${this.baseUrl}/api/users/${uid}/profile/xp`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify({ xpPoints, streak })
@@ -209,7 +247,7 @@ class MongoApiService {
 
   async saveResume(uid: string, text: string, filename: string, parsedData: any, targetRole: string): Promise<any> {
     if (!this.isValidUid(uid)) return null;
-    const response = await fetch(`${BASE_URL}/api/users/${uid}/resumes`, {
+    const response = await fetch(`${this.baseUrl}/api/users/${uid}/resumes`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ text, filename, parsedData, targetRole })
@@ -222,7 +260,7 @@ class MongoApiService {
   async getResumes(uid: string): Promise<any[]> {
     if (!this.isValidUid(uid)) return [];
     try {
-      const response = await fetch(`${BASE_URL}/api/users/${uid}/resumes?t=${Date.now()}`, {
+      const response = await fetch(`${this.baseUrl}/api/users/${uid}/resumes?t=${Date.now()}`, {
         headers: this.getHeaders(),
         cache: 'no-store'
       });
@@ -240,7 +278,7 @@ class MongoApiService {
 
   async deleteResume(uid: string, id: string): Promise<void> {
     if (!this.isValidUid(uid)) return;
-    const response = await fetch(`${BASE_URL}/api/users/${uid}/resumes/${id}`, {
+    const response = await fetch(`${this.baseUrl}/api/users/${uid}/resumes/${id}`, {
       method: 'DELETE',
       headers: this.getHeaders()
     });
@@ -252,7 +290,7 @@ class MongoApiService {
 
   async deleteAllResumes(uid: string): Promise<void> {
     if (!this.isValidUid(uid)) return;
-    const response = await fetch(`${BASE_URL}/api/users/${uid}/resumes`, {
+    const response = await fetch(`${this.baseUrl}/api/users/${uid}/resumes`, {
       method: 'DELETE',
       headers: this.getHeaders()
     });
@@ -264,7 +302,7 @@ class MongoApiService {
 
   async saveAtsResult(uid: string, resumeId: string, result: any): Promise<any> {
     if (!this.isValidUid(uid)) return null;
-    const response = await fetch(`${BASE_URL}/api/users/${uid}/atsResults`, {
+    const response = await fetch(`${this.baseUrl}/api/users/${uid}/atsResults`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ ...result, resumeId })
@@ -275,8 +313,8 @@ class MongoApiService {
   async getAtsResult(uid: string, resumeId?: string): Promise<any | null> {
     if (!this.isValidUid(uid)) return null;
     const url = resumeId 
-      ? `${BASE_URL}/api/users/${uid}/atsResults?resumeId=${resumeId}`
-      : `${BASE_URL}/api/users/${uid}/atsResults`;
+      ? `${this.baseUrl}/api/users/${uid}/atsResults?resumeId=${resumeId}`
+      : `${this.baseUrl}/api/users/${uid}/atsResults`;
     const response = await fetch(url, {
       headers: this.getHeaders()
     });
@@ -286,7 +324,7 @@ class MongoApiService {
 
   async saveRoadmap(uid: string, resumeId: string, roadmap: any): Promise<any> {
     if (!this.isValidUid(uid)) return null;
-    const response = await fetch(`${BASE_URL}/api/users/${uid}/roadmaps`, {
+    const response = await fetch(`${this.baseUrl}/api/users/${uid}/roadmaps`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ ...roadmap, resumeId })
@@ -297,8 +335,8 @@ class MongoApiService {
   async getRoadmap(uid: string, resumeId?: string): Promise<any | null> {
     if (!this.isValidUid(uid)) return null;
     const url = resumeId 
-      ? `${BASE_URL}/api/users/${uid}/roadmaps?resumeId=${resumeId}`
-      : `${BASE_URL}/api/users/${uid}/roadmaps`;
+      ? `${this.baseUrl}/api/users/${uid}/roadmaps?resumeId=${resumeId}`
+      : `${this.baseUrl}/api/users/${uid}/roadmaps`;
     const response = await fetch(url, {
       headers: this.getHeaders()
     });
