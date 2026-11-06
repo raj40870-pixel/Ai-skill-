@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://ais-pre-tq3vxh6hrjx2d6745m3zhc-435432813811.asia-southeast1.run.app/api/:path*"
+      "destination": "https://career-navigation-ai.ai.studio/api/:path*"
     },
     {
       "source": "/(.*)",
