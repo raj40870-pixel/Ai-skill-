@@ -100,10 +100,10 @@ const MentorshipTab: React.FC<MentorshipTabProps> = ({ user }) => {
   const baseTextRef = useRef<string>('');
 
   const quickActions = [
-    { label: 'Fix Resume', icon: FileText, prompt: 'Analyze my resume and fix any big mistakes.' },
-    { label: 'Study Doubt', icon: Layout, prompt: 'I have a doubt in my studies. Can you explain a complex Math or Science topic?' },
-    { label: 'Interview Help', icon: Target, prompt: 'Ask me 5 hard interview questions for my role.' },
-    { label: 'Fast Roadmap', icon: Layout, prompt: 'Give me a fast 10-day roadmap to learn a new skill.' }
+    { label: 'System Architecture', icon: Layout, prompt: 'Evaluate trade-offs between PostgreSQL compound indexes vs Redis caching for high-concurrency feeds.' },
+    { label: 'Google XYZ Bullets', icon: FileText, prompt: 'Review my resume technical bullets and rewrite them using Google\'s XYZ formula with quantifiable impact.' },
+    { label: 'Staff Interview Drills', icon: Target, prompt: 'Drill me on distributed systems, microservices failure recovery, and STAR leadership scenarios.' },
+    { label: 'Offer & Compensation', icon: Zap, prompt: 'How do I negotiate compensation between multiple senior engineering offers to maximize equity and base?' }
   ];
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -613,9 +613,9 @@ const MentorshipTab: React.FC<MentorshipTabProps> = ({ user }) => {
               <div className="w-20 h-20 bg-indigo-50 rounded-3xl flex items-center justify-center mb-6 text-indigo-600 shadow-sm border border-indigo-100">
                 <Bot size={40} />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Universal AI Mentor</h3>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">AI Career & Architecture Mentor</h3>
               <p className="text-slate-500 mb-8 leading-relaxed">
-                Ask me anything—from Career advice and Resume fixes to complex Math, Science, or Study doubts. I'm your multitasking guide for everything.
+                Your 24/7 Staff-level engineering mentor. Get authoritative guidance on system design trade-offs, Google XYZ resume rewrites, senior salary negotiation, and STAR interview drills.
               </p>
               <button 
                 onClick={createNewSession}
@@ -630,7 +630,7 @@ const MentorshipTab: React.FC<MentorshipTabProps> = ({ user }) => {
               {currentSession.messages.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 text-center max-w-sm mx-auto">
                   <Sparkles className="text-indigo-400 mb-4 animate-pulse" size={40} />
-                  <p className="text-slate-500 font-medium">Hello {user?.displayName}! I'm ready to guide you. Ask me anything about your career path or the skills you're working on.</p>
+                  <p className="text-slate-500 font-medium">Hello {user?.displayName}! I'm your Staff Career & Architecture Mentor. Ask me anything about systems design, resume optimization, salary negotiation, or technical interview drills.</p>
                 </div>
               )}
               {currentSession.messages.map((msg, idx) => (

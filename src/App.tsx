@@ -973,8 +973,7 @@ export default function App() {
                         isAdmin={Boolean(
                           user && (
                             (user.email && [
-                              "kamaljit444501@gmail.com",
-                              "kamaljit44501@gmail.com"
+                              "kamaljit444501@gmail.com"
                             ].includes(user.email.toLowerCase())) ||
                             user.plan === 'ENTERPRISE_ADMIN' ||
                             user.plan === 'ADMIN' ||
@@ -994,8 +993,7 @@ export default function App() {
                         onClearAllHistory={handleClearAllHistory}
                         onNavigate={(tab) => setActiveTab(tab)}
                         isAdmin={!!(user?.email && [
-                          "kamaljit444501@gmail.com",
-                          "kamaljit44501@gmail.com"
+                          "kamaljit444501@gmail.com"
                         ].includes(user.email.toLowerCase())) || user?.plan === 'ADMIN' || user?.isAdmin === true}
                       />
                     </motion.div>

@@ -259,7 +259,7 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
             <div className="hidden lg:flex items-center gap-8 text-sm font-medium text-muted-foreground">
               <a href="#features" className="hover:text-primary transition-colors">Features</a>
               <a href="#how-it-works" className="hover:text-primary transition-colors">How it Works</a>
-              <a href="#testimonials" className="hover:text-primary transition-colors">About</a>
+              <button onClick={() => setModalType('about')} className="hover:text-primary transition-colors cursor-pointer font-medium">About</button>
             </div>
 
             <div className="flex items-center gap-3">
@@ -651,6 +651,18 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
                   "8-Point technical criteria breakdown (Keywords, Metrics, Layout)",
                   "Exact deduction explanations with score / max benchmarks",
                   "Severity-ranked priority fixes to bypass screening filters"
+                ]
+              },
+              {
+                icon: <Sparkles className="w-6 h-6 text-indigo-500" />,
+                badge: "24/7 INTERACTIVE ENGINEERING MENTOR",
+                badgeColor: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+                title: "AI Career & Architecture Mentor",
+                desc: "Your 24/7 Staff-level engineering mentor for architecture trade-offs, XYZ resume rewrites, STAR interview drills, and senior offer negotiations.",
+                deliverables: [
+                  "Context-aware guidance deeply calibrated to your uploaded resume",
+                  "System design trade-off reviews & high-concurrency architecture advice",
+                  "Voice typing in Hindi/English, file attachments, and audio narration"
                 ]
               },
               {

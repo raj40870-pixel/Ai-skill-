@@ -75,7 +75,7 @@ export function UploadResumeTab({ userId, onSuccess, onNavigate, isAdmin }: Uplo
             </h4>
             <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
               <p>
-                • <strong>2 to 5 Resumes Free:</strong> You can save up to 5 resumes simultaneously.
+                • <strong>3 Free Resumes:</strong> You can save up to 3 resumes simultaneously in your Career History.
               </p>
               <p>
                 • <strong>Instant Refresh:</strong> When full, delete any old resume from your History to free up a slot immediately.

@@ -3275,6 +3275,19 @@ Return valid JSON with format:
         uid = `guest_${Date.now()}`;
       }
 
+      // Check scan usage quota for authenticated users
+      if (uid && !uid.startsWith('guest_')) {
+        const usageCheck = await checkAndIncrementUsage(uid, false);
+        if (!usageCheck.allowed) {
+          const resetStr = usageCheck.resetDate ? new Date(usageCheck.resetDate).toLocaleDateString() : '7 days';
+          return res.status(403).json({
+            error: "Weekly scan limit reached",
+            message: `You have used all 3 free resume scans for this 7-day cycle. Your free quota resets on ${resetStr}.`,
+            resetDate: usageCheck.resetDate
+          });
+        }
+      }
+
       // If text is empty, provide resilient structured profile so user never gets blocked
       if (!text || text.length < 10) {
         const detectedProfession = detectProfession(filename)?.role || targetRole || "Software Engineer";
@@ -3678,6 +3691,12 @@ Cloud Platform Architecture | Tech: React, Node.js, MongoDB`;
           skill_gap_report: stage34Data.gapAnalysis
         });
         savedRoadmapObj = { id: savedRoadmap._id, ...savedRoadmap };
+      }
+
+      // Deduct 1 analysis credit upon successful completion
+      if (uid && !uid.startsWith('guest_')) {
+        await checkAndIncrementUsage(uid, true);
+        console.log(`[server] [Analysis] Deducted 1 scan credit for user ${uid}`);
       }
 
       console.log(`[server] [Analysis] Pipeline complete. ID: ${analysisId}`);
@@ -4275,19 +4294,20 @@ Cloud Platform Service | Tech: React, Node.js, MongoDB`;
       // Build AI prompt
       const messagesList = session.messages || [];
       const history = messagesList.slice(-10).map((m: any) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join("\n");
-      const systemPrompt = `You are a Universal AI Mentor and Career Guide. 
-Your goal is to provide FAST, DIRECT, and ACCURATE answers to ANY query.
+      const systemPrompt = `You are an Elite AI Career & Systems Architecture Mentor (Director of Engineering & Senior Staff Engineer caliber).
+Your goal is to provide FAST, INCISIVE, HIGH-RIGOR, and ACTIONABLE engineering & career advice.
 
-CAPABILITIES:
-1. **Career Expert**: Resume fixing, interview prep, and roadmaps.
-2. **Academic Tutor**: Solve complex Math, Science, and general study doubts like a professional teacher.
-3. **General Knowledge**: Answer any query clearly and concisely, like ChatGPT.
+CORE EXPERTISE:
+1. **Systems Architecture & Scale**: Distributed systems, microservices vs monolith trade-offs, database indexing, caching strategies (Redis vs Memcached), high-concurrency resilience, and low-latency patterns.
+2. **Career Acceleration & Google XYZ Resumes**: Transform weak bullets into quantified impact statements using Google's formula [Accomplished X, measured by Y, by doing Z]. Eliminate passive filler phrases.
+3. **Staff/Senior Interview & Salary Leverage**: Whiteboard architecture drills, STAR behavioral stories, offer comparisons, and equity/base negotiation strategy.
 
-CORE DIRECTIVES:
-- Address ALL parts of the user's query.
-- Use Hinglish/Hindi naturally for clarity.
-- If a query is Science/Math, provide a step-by-step logic.
-- NO fluff. FIX problems immediately.
+COMMUNICATION DIRECTIVES:
+- Deliver direct, punchy, and highly practical technical insights immediately.
+- Zero fluff or generic textbook filler. Jump straight to the architectural decision, code solution, or actionable resume fix.
+- Use clean formatting (bullet points, bold highlights, concise markdown).
+- Naturally converse in English or Hinglish/Hindi based on user phrasing.
+- Keep responses compact, crisp, and fast to minimize latency while maintaining staff-level depth.
 
 ${contextString}
 ${attachmentsContext}

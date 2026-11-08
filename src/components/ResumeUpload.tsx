@@ -206,16 +206,17 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
     // Check if 7-day scan credit limit is reached (admins are exempt)
     if (!isAdmin && usage && usage.plan !== 'PREMIUM' && usage.availableCredits <= 0) {
       const daysLeft = Math.max(1, Math.ceil((new Date(usage.resetDate || Date.now()).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-      toast.error(`7-Day Free Scan Limit Reached (3/3). Your credits will reset in ${daysLeft} days.`);
-      setError(`You have used all 3 free resume scans for this 7-day cycle. Your free scans will automatically reset in ${daysLeft} days.`);
+      const resetStr = usage.resetDate ? new Date(usage.resetDate).toLocaleDateString() : `${daysLeft} days`;
+      toast.error(`7-Day Free Scan Limit Reached (3/3 Used). Quota resets on ${resetStr}.`);
+      setError(`आपकी 3 फ्री रिज्यूमे स्कैनिंग लिमिट पूरी हो चुकी है। आपकी यह लिमिट ${resetStr} को ऑटोमैटिकली रीसेट होगी। कृपया वापस आने तक इंतज़ार करें।`);
       setStatus('error');
       return;
     }
 
     // Check if free storage limit of 3 is exceeded (admins are exempt)
     if (!isAdmin && savedCount >= FREE_RESUME_LIMIT) {
-      toast.error(`Free Limit Reached (${savedCount}/${FREE_RESUME_LIMIT}). Please delete an older resume in History first.`);
-      setError(`You have reached the free limit of ${FREE_RESUME_LIMIT} stored resumes. Please delete an older resume from History to upload a new one.`);
+      toast.error(`3 History Slots Full. Please delete an older resume in History first.`);
+      setError(`आपके 3 फ्री रिज्यूमे स्लॉट्स भर चुके हैं (${savedCount}/${FREE_RESUME_LIMIT})। नया रिज्यूमे अपलोड करने के लिए कृपया Career History में जाकर पुराना रिज्यूमे डिलीट करें।`);
       setStatus('error');
       return;
     }
@@ -298,15 +299,12 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
 
   const isCreditLimitReached = !isAdmin && usage !== null && usage.plan !== 'PREMIUM' && usage.availableCredits <= 0;
   const isStorageLimitReached = !isAdmin && savedCount >= FREE_RESUME_LIMIT;
-  const isLimitReached = isCreditLimitReached || isStorageLimitReached;
-  const daysUntilCreditReset = Math.max(1, Math.ceil((new Date(usage?.resetDate || Date.now()).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
 
   return (
     <div 
       className={cn(
         "relative rounded-[2.5rem] border-2 border-dashed transition-all p-8 sm:p-12 text-center flex flex-col items-center justify-center min-h-[380px] bg-card/40 backdrop-blur-md",
-        isDragging ? "border-primary bg-primary/5 scale-[0.99]" : "border-border/80 hover:border-primary/50",
-        isLimitReached ? "border-amber-500/40 bg-amber-500/[0.02]" : ""
+        isDragging ? "border-primary bg-primary/5 scale-[0.99]" : "border-border/80 hover:border-primary/50"
       )}
       onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
       onDragLeave={() => setIsDragging(false)}
@@ -319,53 +317,7 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
       }}
     >
       <AnimatePresence mode="wait">
-        {status === 'idle' && isLimitReached && (
-          <motion.div
-            key="limit-reached"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md mx-auto space-y-5"
-          >
-            <div className="w-16 h-16 rounded-3xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto border border-amber-500/20">
-              <AlertTriangle className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-2">
-              <span className="px-3 py-1 rounded-full bg-amber-500/15 text-amber-600 text-xs font-black uppercase tracking-wider">
-                {isCreditLimitReached ? "Weekly Scan Limit Reached (3 / 3 Used)" : `Storage Limit Reached (${savedCount} / ${FREE_RESUME_LIMIT} Resumes)`}
-              </span>
-              <h3 className="text-2xl font-black text-foreground tracking-tight pt-1">
-                {isCreditLimitReached ? "7-Day Scan Limit Reached" : "Storage Limit Full"}
-              </h3>
-              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                {isCreditLimitReached ? (
-                  <>
-                    You have used your <strong>3 free resume scans</strong> for this 7-day cycle. To prevent spam and API overload, free accounts receive 3 full scans every 7 days. Your quota will automatically refresh in <strong>{daysUntilCreditReset} days</strong>.
-                  </>
-                ) : (
-                  <>
-                    You have reached the free limit of <strong>3 saved resumes</strong>. Your free scan allowance automatically refreshes every <strong>7 days</strong>, or you can delete an older resume from your Career History right now to free up a slot immediately.
-                  </>
-                )}
-              </p>
-            </div>
-
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-              {onNavigate && (
-                <Button
-                  onClick={() => onNavigate('history')}
-                  className="rounded-2xl h-12 px-6 font-black bg-primary text-primary-foreground hover:bg-primary/90 text-xs uppercase tracking-wider shadow-lg shadow-primary/20 gap-2 cursor-pointer w-full sm:w-auto"
-                >
-                  <History className="w-4 h-4" />
-                  <span>Go to History & Manage Resumes</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Button>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {status === 'idle' && !isLimitReached && (
+        {status === 'idle' && (
           <motion.div 
             key="idle"
             initial={{ opacity: 0, y: 10 }}
@@ -373,12 +325,6 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
             exit={{ opacity: 0, y: -10 }}
             className="space-y-6 max-w-xl mx-auto"
           >
-            {/* Top Limit Meter */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-muted/60 border border-border text-xs font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Free Quota: {savedCount} of {FREE_RESUME_LIMIT} Resumes Used</span>
-              <span className="text-muted-foreground">({FREE_RESUME_LIMIT - savedCount} slots open)</span>
-            </div>
 
             <div className="w-20 h-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto shadow-inner border border-primary/20">
               <Upload className="w-10 h-10 animate-bounce" />
@@ -431,27 +377,6 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
 
             {/* Free Tier & Instant Speed Info Banner */}
             <div className="pt-2 flex flex-wrap items-center justify-center gap-3 text-[11px] font-semibold text-muted-foreground">
-              {usage?.plan !== 'PREMIUM' && (
-                <span className={cn(
-                  "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full font-bold transition-colors",
-                  usage && usage.availableCredits > 0 
-                    ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" 
-                    : "bg-amber-500/10 text-amber-600 border border-amber-500/20"
-                )}>
-                  <RotateCcw className={cn("w-3.5 h-3.5", usage && usage.availableCredits > 0 ? "animate-pulse" : "")} />
-                  {loadingUsage 
-                    ? "Checking Credits..." 
-                    : usage && usage.availableCredits > 0 
-                      ? `Scans Available: ${usage.availableCredits} / 3 Free Scans (7-Day Cycle)` 
-                      : `3/3 Limit Reached • Resets in ${daysUntilCreditReset} days`}
-                </span>
-              )}
-              {usage?.plan === 'PREMIUM' && (
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Premium: Unlimited Scans Available
-                </span>
-              )}
               <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold">
                 <Sparkles className="w-3.5 h-3.5 text-primary" />
                 Fast 2–5 Seconds Instant AI Scan
@@ -515,28 +440,27 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
             </div>
             <div className="space-y-1">
               <h3 className="text-xl font-bold text-destructive">
-                {isLimitReached ? "Free Limit Reached" : "Upload Failed"}
+                {(isCreditLimitReached || isStorageLimitReached) ? "Limit Notice" : "Upload Failed"}
               </h3>
               <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
                 {error}
               </p>
             </div>
-            <div className="flex justify-center gap-3 pt-2">
-              {isLimitReached && onNavigate ? (
+            <div className="flex flex-wrap justify-center gap-3 pt-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setStatus('idle')} 
+                className="rounded-xl font-bold cursor-pointer"
+              >
+                Try Again
+              </Button>
+              {onNavigate && (
                 <Button 
                   onClick={() => onNavigate('history')} 
                   className="rounded-xl font-bold cursor-pointer bg-primary text-primary-foreground gap-2"
                 >
                   <History className="w-4 h-4" />
                   <span>Go to History</span>
-                </Button>
-              ) : (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setStatus('idle')} 
-                  className="rounded-xl font-bold cursor-pointer"
-                >
-                  Try Again
                 </Button>
               )}
             </div>
@@ -545,7 +469,7 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
       </AnimatePresence>
 
       {/* Dragging Overlay */}
-      {isDragging && !isLimitReached && (
+      {isDragging && (
         <motion.div 
           className="absolute inset-0 bg-primary/10 border-2 border-primary border-dashed rounded-[2.5rem] pointer-events-none flex items-center justify-center backdrop-blur-xs"
           initial={{ opacity: 0 }}
