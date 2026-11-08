@@ -22,7 +22,6 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { AVAILABLE_GEMINI_MODELS, getActiveAIModel, AIModelOption } from '../services/geminiService';
 import { mongoApi } from '../lib/mongoApi';
 
 interface SettingsTabProps {
@@ -32,10 +31,7 @@ interface SettingsTabProps {
   onNavigate?: (tab: string) => void;
 }
 
-export function SettingsTab({ userId, selectedModel = 'gemini-3.7-flash', onModelChange, onNavigate }: SettingsTabProps) {
-  const [engineLevel, setEngineLevel] = useState<string>(() => {
-    return getActiveAIModel();
-  });
+export function SettingsTab({ userId, onNavigate }: SettingsTabProps) {
   const [notifications, setNotifications] = useState(true);
   const [clearing, setClearing] = useState(false);
   const [resumeCount, setResumeCount] = useState<number>(0);
@@ -43,12 +39,6 @@ export function SettingsTab({ userId, selectedModel = 'gemini-3.7-flash', onMode
   const [usageStats, setUsageStats] = useState<{ analysisCount: number; availableCredits: number; resetDate: string; plan: string; limit: number } | null>(null);
 
   const HISTORY_LIMIT = 3;
-
-  useEffect(() => {
-    if (selectedModel) {
-      setEngineLevel(selectedModel);
-    }
-  }, [selectedModel]);
 
   useEffect(() => {
     async function loadUsage() {
@@ -77,23 +67,7 @@ export function SettingsTab({ userId, selectedModel = 'gemini-3.7-flash', onMode
     loadUsage();
   }, [userId]);
 
-  const handleModelSelect = (model: AIModelOption) => {
-    // If user clicks a Pro / Locked model, prevent switching & show friendly alert
-    if (model.tier === 'pro' && usageStats?.plan !== 'PREMIUM') {
-      toast.error(
-        `${model.name} is reserved for the Premium Plan. Active model remains on ${AVAILABLE_GEMINI_MODELS.find(m => m.id === engineLevel)?.name || 'Gemini 3.7 Flash'}.`,
-        { duration: 4000 }
-      );
-      return;
-    }
 
-    setEngineLevel(model.id);
-    localStorage.setItem('careernav_ai_model', model.id);
-    if (onModelChange) {
-      onModelChange(model.id);
-    }
-    toast.success(`Active AI engine switched to ${model.name} (Free Tier)`);
-  };
 
   const handleClearCache = async () => {
     try {
@@ -238,114 +212,7 @@ export function SettingsTab({ userId, selectedModel = 'gemini-3.7-flash', onMode
         </div>
       </div>
 
-      {/* Model Switching Section */}
-      <Card className="glass border-none rounded-[2.5rem] p-6 sm:p-8 bg-card/60 shadow-xl space-y-6 border border-border/50">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="font-black text-xl tracking-tight flex items-center gap-2 text-foreground">
-              <Cpu className="w-5 h-5 text-primary" />
-              AI Cognitive Model Switcher
-            </h3>
-            <p className="text-xs text-muted-foreground mt-1">
-              Select which free Gemini model to use for resume text extraction, ATS scoring, and roadmap generation.
-            </p>
-          </div>
-          <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0 self-start sm:self-auto">
-            Current: {AVAILABLE_GEMINI_MODELS.find(m => m.id === engineLevel)?.name || engineLevel}
-          </span>
-        </div>
 
-        {/* Model Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {AVAILABLE_GEMINI_MODELS.map((model) => {
-            const isSelected = engineLevel === model.id;
-            const isPro = model.tier === 'pro';
-
-            return (
-              <div
-                key={model.id}
-                onClick={() => handleModelSelect(model)}
-                className={`p-5 rounded-3xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
-                  isSelected 
-                    ? "bg-primary/5 border-primary shadow-md shadow-primary/10 ring-2 ring-primary/20" 
-                    : isPro
-                    ? "bg-muted/20 border-border/60 opacity-75 hover:opacity-90"
-                    : "bg-card/80 border-border/80 hover:border-primary/40 hover:bg-card"
-                }`}
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
-                        isSelected 
-                          ? "bg-primary text-primary-foreground" 
-                          : isPro
-                          ? "bg-muted text-muted-foreground"
-                          : "bg-muted/60 text-foreground"
-                      }`}>
-                        {isPro ? <Lock className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
-                      </div>
-                      <div>
-                        <h4 className="font-black text-sm text-foreground flex items-center gap-1.5">
-                          {model.name}
-                          {model.isRecommended && (
-                            <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 text-[10px] font-extrabold">
-                              Recommended
-                            </span>
-                          )}
-                        </h4>
-                        <span className="text-[10px] text-muted-foreground font-semibold block">
-                          {model.speed}
-                        </span>
-                      </div>
-                    </div>
-
-                    {isSelected ? (
-                      <span className="px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-[11px] font-black flex items-center gap-1 shadow-xs">
-                        <Check className="w-3 h-3" />
-                        Active
-                      </span>
-                    ) : isPro ? (
-                      <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center gap-1">
-                        <Lock className="w-3 h-3" />
-                        Pro Tier
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-bold">
-                        Free Tier
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {model.description}
-                  </p>
-                </div>
-
-                <div className="pt-4 flex items-center justify-between border-t border-border/40 mt-3 text-[11px]">
-                  <span className="text-muted-foreground font-medium truncate max-w-[200px]">
-                    Best for: <strong className="text-foreground">{model.bestFor.split(',')[0]}</strong>
-                  </span>
-                  <Button
-                    size="sm"
-                    variant={isSelected ? "default" : "outline"}
-                    disabled={isPro}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleModelSelect(model);
-                    }}
-                    className={`h-7 px-3 text-[11px] font-bold rounded-xl ${
-                      isSelected ? "bg-primary text-primary-foreground" : "cursor-pointer"
-                    }`}
-                  >
-                    {isSelected ? "Selected" : isPro ? "Locked (Pro)" : "Switch Model"}
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
 
       {/* Additional Configuration & Storage Security */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

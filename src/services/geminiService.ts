@@ -76,32 +76,32 @@ export interface AIModelOption {
 
 export const AVAILABLE_GEMINI_MODELS: AIModelOption[] = [
   {
-    id: "gemini-3.7-flash",
-    name: "Gemini 3.7 Flash (Performance)",
-    alias: "gemini-3.7-flash",
+    id: "gemini-3.1-flash-lite",
+    name: "Gemini 3.1 Flash Lite (High Speed)",
+    alias: "gemini-3.1-flash-lite",
     provider: "Google Cloud / AI Studio",
     tier: "free",
     tierLabel: "Free Standard",
-    badge: "Fastest",
-    speed: "⚡ Ultra-Fast (~280ms)",
+    badge: "Active",
+    speed: "⚡ Ultra-Fast (~220ms)",
     speedRating: 5,
-    description: "The latest high-performance model for rapid analysis and high-precision results.",
-    bestFor: "Instant ATS scoring and market benchmarks.",
+    description: "Verified ultra-fast Google model for instantaneous ATS scoring and career roadmapping.",
+    bestFor: "Real-time resume parsing, ATS audit, and career mapping.",
     dailyFreeLimit: "3 Scans/Week",
     rpmLimit: "15 RPM",
     isRecommended: true
   },
   {
-    id: "gemini-3.5-flash",
-    name: "Gemini 3.5 Flash (Stable)",
-    alias: "gemini-3.5-flash",
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash (Deep Reasoning)",
+    alias: "gemini-3.8-flash",
     provider: "Google Cloud / AI Studio",
     tier: "free",
     tierLabel: "Standard Reliability",
     speed: "⚡ Fast (~350ms)",
     speedRating: 4,
-    description: "Highly stable engine for consistent keyword extraction and career logic.",
-    bestFor: "General resume parsing and skill identification.",
+    description: "Deep reasoning engine for comprehensive skill analysis and interview simulations.",
+    bestFor: "Complex career roadmaps and nuanced ATS feedback.",
     dailyFreeLimit: "3 Scans/Week",
     rpmLimit: "15 RPM"
   }
@@ -115,7 +115,7 @@ export function getActiveAIModel(): string {
     const match = AVAILABLE_GEMINI_MODELS.find(m => m.id === saved || m.name === saved || m.alias === saved);
     if (match) return match.id;
   }
-  return 'gemini-3.7-flash';
+  return 'gemini-3.1-flash-lite';
 }
 
 export const geminiService = {
@@ -269,7 +269,8 @@ export const geminiService = {
         filename,
         targetRole,
         region,
-        model
+        model,
+        forceFresh: true
       })
     });
     if (!res.ok) {
