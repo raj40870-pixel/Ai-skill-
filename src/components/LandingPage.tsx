@@ -22,7 +22,11 @@ import {
   Check,
   Loader2,
   RefreshCw,
-  LifeBuoy
+  LifeBuoy,
+  BarChart3,
+  Download,
+  DollarSign,
+  Award
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -615,65 +619,218 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
 
 
 
-      {/* SECTION 4 — FEATURES SECTION */}
-      <section id="features" className="py-32 relative">
+      {/* SECTION 4 — FEATURES & FACILITIES SHOWCASE */}
+      <section id="features" className="py-24 sm:py-32 relative">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-20">
-            <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">
-              A Complete <span className="text-primary italic">AI Career</span> Ecosystem
+          <div className="text-center max-w-3xl mx-auto mb-16 sm:mb-20">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-black uppercase tracking-wider mb-4">
+              <Sparkles className="w-3.5 h-3.5 text-primary fill-current" />
+              <span>Full Career Acceleration Platform</span>
+            </div>
+            <h2 className="text-3xl sm:text-5xl font-black mb-6 tracking-tight text-foreground">
+              Everything We Analyze & Provide <br className="hidden sm:inline" />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#7C3AED] via-[#2563EB] to-emerald-500">
+                Inside Your Free Account
+              </span>
             </h2>
-            <p className="text-muted-foreground text-lg">
-              Stop guessing. Use data-driven career intelligence to land your dream role.
+            <p className="text-muted-foreground text-sm sm:text-lg leading-relaxed">
+              Stop guessing why your applications get rejected. See the exact institutional ATS diagnostics, Google XYZ bullet rewrites, personalized 4-week execution roadmaps, and real 2026 salary benchmarks you get as soon as you sign in.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* 9 Comprehensive Facility Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {[
-              { 
-                icon: <FileText className="text-[#7C3AED]" />, 
-                title: "Resume Analysis", 
-                desc: "Get deep institutional-grade parsing of your technical background." 
+              {
+                icon: <BarChart3 className="w-6 h-6 text-emerald-500" />,
+                badge: "WORKDAY & JOBSCAN CALIBRATED",
+                badgeColor: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+                title: "Institutional ATS Scorecard",
+                desc: "Tests your resume against enterprise applicant tracking filters with an institutional score out of 100.",
+                deliverables: [
+                  "8-Point technical criteria breakdown (Keywords, Metrics, Layout)",
+                  "Exact deduction explanations with score / max benchmarks",
+                  "Severity-ranked priority fixes to bypass screening filters"
+                ]
               },
-              { 
-                icon: <Zap className="text-yellow-500" />, 
-                title: "Roadmap Builder", 
-                desc: "AI-generated step-by-step learning paths to bridge your skill gaps." 
+              {
+                icon: <Sparkles className="w-6 h-6 text-purple-500" />,
+                badge: "GOOGLE XYZ FORMULA",
+                badgeColor: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+                title: "Resume Bullet Rewrite Lab",
+                desc: "Interactive before vs. after transformation lab converting weak passive duties into top 5% power bullets.",
+                deliverables: [
+                  "Eliminates passive phrases like 'Responsible for' or 'Helped with'",
+                  "Embeds quantifiable KPIs (% latency drop, $ revenue, user scale)",
+                  "Delivers direct +14 point boost on semantic keyword parsers"
+                ]
               },
-              { 
-                icon: <MessageSquare className="text-purple-500" />, 
-                title: "AI Interview Prep", 
-                desc: "Practice with custom questions tailored to your experience." 
+              {
+                icon: <Search className="w-6 h-6 text-blue-500" />,
+                badge: "2026 LIVE MARKET REQUISITIONS",
+                badgeColor: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+                title: "Deep Skill Gap & Recruiter Friction",
+                desc: "Scans your tech stack against live 2026 job postings to pinpoint exactly why recruiters might pass on you.",
+                deliverables: [
+                  "Verified profile strengths vs. missing high-demand frameworks",
+                  "'Hiring Friction' insights explaining recruiter rejection triggers",
+                  "Prescribed hands-on coding fixes to bridge every detected gap"
+                ]
               },
-              { 
-                icon: <Search className="text-blue-500" />, 
-                title: "Skill Gap Detection", 
-                desc: "Identify exactly what is missing between you and the job." 
+              {
+                icon: <TrendingUp className="w-6 h-6 text-indigo-500" />,
+                badge: "STEP-BY-STEP EXECUTION",
+                badgeColor: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+                title: "4-Week Career Sprint Roadmap",
+                desc: "Custom weekly execution plan with practical projects designed to take you from current state to interview-ready.",
+                deliverables: [
+                  "4 Structured weekly milestone themes & hands-on deliverables",
+                  "Daily task checklists with realistic study hour allocations",
+                  "Production-grade GitHub portfolio deliverables per sprint"
+                ]
               },
-              { 
-                icon: <History className="text-orange-500" />, 
-                title: "Resume Versioning", 
-                desc: "Track history and optimize multiple versions for different roles." 
+              {
+                icon: <DollarSign className="w-6 h-6 text-emerald-600" />,
+                badge: "VERIFIED COMPENSATION DATA",
+                badgeColor: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+                title: "Global Salary Benchmarks (2026)",
+                desc: "Unbiased, real-world compensation bands across major tech hubs to give you negotiation leverage.",
+                deliverables: [
+                  "US Silicon Valley & Tier 1 bands ($115k – $165k+ / year)",
+                  "European Union / UK and high-growth Global Remote tiers",
+                  "India Product Hubs (Bengaluru / NCR ₹18L – ₹38L+ salary bands)"
+                ]
               },
-              { 
-                icon: <Shield className="text-red-500" />, 
-                title: "Verified Intelligence", 
-                desc: "Built on real 2026 hiring data and recruitment insights." 
+              {
+                icon: <Zap className="w-6 h-6 text-amber-500" />,
+                badge: "1-CLICK DIRECT HYPERLINKS",
+                badgeColor: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+                title: "Curated Learning Resources",
+                desc: "Direct clickable links to the best official documentation, interactive coding sandboxes, and video curricula.",
+                deliverables: [
+                  "Official documentation & standard architectural references",
+                  "Hands-on interactive practice sandboxes (LeetCode, FreeCodeCamp)",
+                  "Curated video courses and deep-dive community tutorials"
+                ]
               },
+              {
+                icon: <Download className="w-6 h-6 text-rose-500" />,
+                badge: "EXECUTIVE PRINTABLE EXPORT",
+                badgeColor: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+                title: "Multi-Page PDF Audit Reports",
+                desc: "Export clean, presentation-ready institutional career audit reports with live links and zero formatting bugs.",
+                deliverables: [
+                  "Download Consolidated Full Career Audit Report (PDF)",
+                  "Export individual Skill Gap Audit and Learning Plan PDFs",
+                  "Clean typography, running headers, and clickable resource buttons"
+                ]
+              },
+              {
+                icon: <MessageSquare className="w-6 h-6 text-cyan-500" />,
+                badge: "ROLE-SPECIFIC DRILLS",
+                badgeColor: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
+                title: "AI Interview Simulation & Drills",
+                desc: "Practice role-specific technical questions, architecture scenarios, and behavioral STAR stories.",
+                deliverables: [
+                  "Target role-specific technical interview questions",
+                  "System design scenario evaluations & trade-off guidance",
+                  "Instant AI feedback on your practice answers"
+                ]
+              },
+              {
+                icon: <History className="w-6 h-6 text-orange-500" />,
+                badge: "PRIVATE & ENCRYPTED",
+                badgeColor: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+                title: "Resume Versioning & Cloud History",
+                desc: "Manage multiple tailored resume versions for different job applications with automatic cloud backup.",
+                deliverables: [
+                  "Compare scores across different target roles (e.g. AI vs Full Stack)",
+                  "Track score improvements over time as you apply recommendations",
+                  "Encrypted private cloud storage with 7-day retention safety"
+                ]
+              }
             ].map((feature, i) => (
               <motion.div
                 key={i}
-                whileHover={{ y: -5 }}
-                className="glass rounded-3xl p-8 border border-white/10 hover:border-primary/30 transition-all group"
+                whileHover={{ y: -6 }}
+                transition={{ duration: 0.2 }}
+                className="glass rounded-3xl p-6 sm:p-7 border border-border/60 hover:border-primary/40 transition-all flex flex-col justify-between group shadow-sm hover:shadow-xl bg-card/40 backdrop-blur-md"
               >
-                <div className="w-12 h-12 rounded-2xl bg-white/50 dark:bg-white/5 flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
-                  {feature.icon}
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-muted/60 dark:bg-white/5 flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform">
+                      {feature.icon}
+                    </div>
+                    <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${feature.badgeColor}`}>
+                      {feature.badge}
+                    </span>
+                  </div>
+
+                  <h3 className="text-lg sm:text-xl font-bold mb-2 text-foreground group-hover:text-primary transition-colors">
+                    {feature.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-5">
+                    {feature.desc}
+                  </p>
                 </div>
-                <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed italic opacity-80">
-                  {feature.desc}
-                </p>
+
+                <div className="pt-4 border-t border-border/40 space-y-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground/80 block mb-1">
+                    What You Get:
+                  </span>
+                  {feature.deliverables.map((item, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-xs text-foreground/90 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                      <span className="leading-tight">{item}</span>
+                    </div>
+                  ))}
+                </div>
               </motion.div>
             ))}
+          </div>
+
+          {/* High-Conversion Sign-In Callout Card */}
+          <div className="mt-16 sm:mt-20 p-8 sm:p-12 rounded-[2.5rem] bg-gradient-to-br from-[#7C3AED]/10 via-primary/5 to-[#2563EB]/10 border border-primary/25 relative overflow-hidden shadow-2xl">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="max-w-3xl mx-auto text-center relative z-10 space-y-5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-black uppercase tracking-wider">
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <span>100% Free • No Credit Card Required</span>
+              </div>
+
+              <h3 className="text-2xl sm:text-4xl font-black text-foreground tracking-tight">
+                Ready to See Your Complete Career Audit?
+              </h3>
+
+              <p className="text-muted-foreground text-sm sm:text-base max-w-xl mx-auto">
+                Sign in or create your free account now to upload your resume and unlock all 9 deep career intelligence facilities in under 30 seconds.
+              </p>
+
+              <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Button 
+                  size="lg" 
+                  onClick={onStart}
+                  className="w-full sm:w-auto h-13 px-8 rounded-2xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] hover:opacity-95 text-white font-extrabold text-base shadow-xl shadow-primary/25 cursor-pointer flex items-center justify-center gap-2 group"
+                >
+                  <Zap className="w-4 h-4 text-yellow-300 fill-current" />
+                  <span>Sign In / Create Free Account</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-6 pt-2 text-xs text-muted-foreground font-medium">
+                <span className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-500" /> Instant 30-Second Analysis
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-blue-500" /> Private & Encrypted Resume
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Download className="w-3.5 h-3.5 text-purple-500" /> Printable PDF Export
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </section>

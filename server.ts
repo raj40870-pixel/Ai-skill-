@@ -519,8 +519,7 @@ async function generateContentReliably(options: {
 }
 
 const ADMIN_EMAILS = [
-  "kamaljit444501@gmail.com",
-  "kamaljit44501@gmail.com"
+  "kamaljit444501@gmail.com"
 ];
 
 // --- USAGE TRACKING HELPERS ---
@@ -2810,6 +2809,11 @@ async function startServer() {
              - 75-84: "Competitive Match" (Strong metrics and high keyword alignment)
              - 85-100: "Top 5% Candidate" (Flawless metrics, deep technical alignment, verified URLs)
           
+          4. PRIORITY FIXES (NO 3-FIX RESTRICTION):
+             - Identify ALL detected flaws, weaknesses, and deduction reasons in the resume.
+             - Provide between 5 to 8 detailed, actionable priority fixes covering metrics, keywords, passive verbs, headings, project links, and impact.
+             - Do NOT artificially limit to only 3 fixes! The candidate needs to see all areas requiring improvement.
+          
           Evaluate this candidate's resume text:
           "${text}"
           
@@ -3372,7 +3376,7 @@ Cloud Platform Architecture | Tech: React, Node.js, MongoDB`;
               "label": string ("Critical ATS Risk" | "Needs Optimization" | "Moderate Fit" | "Competitive Match" | "Top 5% Candidate"),
               "color": string ("rose" | "amber" | "indigo" | "emerald"),
               "breakdown": [{"criterion": string, "score": number, "max": number, "fix": string}],
-              "priority_fixes": [{"problem": string, "impact": string, "fix": string, "severity": "Critical" | "High" | "Medium" | "Low"}]
+              "priority_fixes": [{"problem": string, "impact": string, "fix": string, "severity": "Critical" | "High" | "Medium" | "Low"}] // Provide 5 to 8 detailed priority fixes across all severity tiers, do NOT limit to 3
             }
           }
           Resume: ${text}

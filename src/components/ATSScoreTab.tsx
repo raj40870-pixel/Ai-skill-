@@ -116,6 +116,18 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate }: 
       impact: "Uncommon header names cause enterprise ATS parsers to misclassify or skip sections.", 
       fix: "Stick to industry-standard headers: 'Work Experience', 'Technical Skills', 'Education', and 'Projects'.", 
       severity: 'Low' 
+    },
+    {
+      problem: "Missing Live Portfolio & GitHub Verification Links",
+      impact: "Recruiters and automated screener algorithms rank unverified code claims lower (approx. 6 points deducted).",
+      fix: "Add live working demo URLs, GitHub repository links, or technical case studies directly under your featured projects.",
+      severity: 'High'
+    },
+    {
+      problem: "Uncategorized Technical Skills Block",
+      impact: "Dense unorganized skill paragraphs reduce keyword parse precision and recruiter readability (approx. 4 points deducted).",
+      fix: "Organize skills into clean categories: Languages, Frameworks, Cloud & DevOps, Databases, and Architecture.",
+      severity: 'Medium'
     }
   ];
 
@@ -161,6 +173,7 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate }: 
         candidateEmail,
         targetRole,
         resumeFilename: resumeData?.filename || "Resume.pdf",
+        parsedResume: resumeData?.parsedData,
         atsData: {
           score,
           market_match: atsData?.market_match || 85,
