@@ -60,6 +60,7 @@ const AtsResultSchema = new mongoose.Schema({
   color: { type: String, default: 'amber' },
   breakdown: { type: [mongoose.Schema.Types.Mixed], default: [] },
   top_3_fixes: { type: [String], default: [] },
+  priority_fixes: { type: [mongoose.Schema.Types.Mixed], default: [] },
   createdAt: { type: Date, default: Date.now }
 });
 

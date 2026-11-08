@@ -302,6 +302,7 @@ function calculateHash(text: string): string {
   return crypto.createHash('sha256').update(text + "_v3_strict_enterprise_ats").digest('hex');
 }
 // --- MULTI-KEY GEMINI API POOL WITH LOAD-BALANCING & AUTO-FAILOVER ---
+// --- MULTI-KEY GEMINI API POOL WITH LOAD-BALANCING & AUTO-FAILOVER ---
 const aiClientsMap = new Map<string, GoogleGenAI>();
 const keyCooldowns = new Map<string, number>(); // apiKey -> cooldown timestamp
 let keyRotationIndex = 0;
@@ -309,31 +310,73 @@ let keyRotationIndex = 0;
 function getGeminiApiKeyPool(): string[] {
   const rawList: string[] = [];
 
-  // Comma-separated pool
+  // 1. Comma/semicolon/newline-separated pool strings
   if (process.env.GEMINI_API_KEYS) {
-    const split = process.env.GEMINI_API_KEYS.split(',').map(k => k.trim());
+    const split = process.env.GEMINI_API_KEYS.split(/[,;\n]+/).map(k => k.trim());
+    rawList.push(...split);
+  }
+  if (process.env.GOOGLE_API_KEYS) {
+    const split = process.env.GOOGLE_API_KEYS.split(/[,;\n]+/).map(k => k.trim());
     rawList.push(...split);
   }
 
-  // Individual accounts/keys (1 to 8)
+  // 2. Individual indexed accounts/keys (1 to 8) - supports multiple naming conventions
   for (let i = 1; i <= 8; i++) {
-    const key = process.env[`GEMINI_API_KEY_${i}`];
-    if (key) rawList.push(key.trim());
+    const k1 = process.env[`GEMINI_API_KEY_${i}`];
+    if (k1) rawList.push(k1.trim());
+    const k2 = process.env[`GEMINI_API_KEY${i}`];
+    if (k2) rawList.push(k2.trim());
+    const k3 = process.env[`GEMINI_KEY_${i}`];
+    if (k3) rawList.push(k3.trim());
+    const k4 = process.env[`GOOGLE_API_KEY_${i}`];
+    if (k4) rawList.push(k4.trim());
+    const k5 = process.env[`GOOGLE_API_KEY${i}`];
+    if (k5) rawList.push(k5.trim());
   }
 
-  // Primary fallback key
-  if (process.env.GEMINI_API_KEY) {
-    rawList.push(process.env.GEMINI_API_KEY.trim());
+  // 3. Primary fallback keys
+  if (process.env.GEMINI_API_KEY) rawList.push(process.env.GEMINI_API_KEY.trim());
+  if (process.env.GOOGLE_API_KEY) rawList.push(process.env.GOOGLE_API_KEY.trim());
+  if (process.env.VITE_GEMINI_API_KEY) rawList.push(process.env.VITE_GEMINI_API_KEY.trim());
+
+  // 4. Dynamic discovery: Scan process.env for any variable containing gemini and key
+  for (const [envKey, envVal] of Object.entries(process.env)) {
+    if (envVal && typeof envVal === 'string' && envVal.length > 20) {
+      const lower = envKey.toLowerCase();
+      if ((lower.includes('gemini') || lower.includes('google')) && lower.includes('key')) {
+        rawList.push(envVal.trim());
+      }
+    }
   }
 
   // Filter out placeholder, empty, or duplicate keys
   const validKeys = Array.from(new Set(
     rawList
-      .map(k => k.replace(/^["']|["']$/g, '').trim())
-      .filter(k => k && k !== 'MY_GEMINI_API_KEY' && k.length > 8)
+      .map(k => k.replace(/^["'`]|["'`]$/g, '').trim())
+      .filter(k => k && k !== 'MY_GEMINI_API_KEY' && k.length > 15)
   ));
 
   return validKeys;
+}
+
+function getGeminiKeysStatus() {
+  const pool = getGeminiApiKeyPool();
+  const now = Date.now();
+  return {
+    totalKeysDetected: pool.length,
+    activeKeyIndex: (keyRotationIndex % Math.max(1, pool.length)) + 1,
+    keys: pool.map((k, idx) => {
+      const cooldown = keyCooldowns.get(k) || 0;
+      const isCoolingDown = now < cooldown;
+      return {
+        keyIndex: idx + 1,
+        preview: k.length > 8 ? `${k.substring(0, 6)}...${k.slice(-4)}` : 'INVALID',
+        length: k.length,
+        status: isCoolingDown ? `cooldown (${Math.round((cooldown - now) / 1000)}s left)` : 'healthy',
+        isCurrentTarget: idx === (keyRotationIndex % Math.max(1, pool.length))
+      };
+    })
+  };
 }
 
 function getAIClientForKey(apiKey: string): GoogleGenAI {
@@ -355,8 +398,7 @@ function getAIClientForKey(apiKey: string): GoogleGenAI {
 function getNextHealthyKey(excludeKeys: Set<string> = new Set()): { key: string; client: GoogleGenAI; poolSize: number; keyIndex: number } {
   const pool = getGeminiApiKeyPool();
   if (pool.length === 0) {
-    // Fallback to empty string client to trigger appropriate error
-    const fallbackKey = (process.env.GEMINI_API_KEY || "").trim().replace(/^["']|["']$/g, "").trim();
+    const fallbackKey = (process.env.GEMINI_API_KEY || "").trim().replace(/^["'`]|["'`]$/g, "").trim();
     return { key: fallbackKey, client: getAIClientForKey(fallbackKey), poolSize: 0, keyIndex: 0 };
   }
 
@@ -372,13 +414,12 @@ function getNextHealthyKey(excludeKeys: Set<string> = new Set()): { key: string;
     }
   }
 
-  // If all non-excluded keys are on cooldown, pick the non-excluded key whose cooldown expires earliest
   let selectedIdx: number;
   if (availableIndices.length > 0) {
     keyRotationIndex = (keyRotationIndex + 1) % availableIndices.length;
     selectedIdx = availableIndices[keyRotationIndex];
   } else {
-    // All available are on cooldown or excluded, pick first valid non-excluded
+    // If all available are excluded or on cooldown, pick the non-excluded key whose cooldown expires earliest
     const remaining = pool.map((_, idx) => idx).filter(idx => !excludeKeys.has(pool[idx]));
     selectedIdx = remaining.length > 0 ? remaining[0] : 0;
   }
@@ -400,7 +441,7 @@ async function generateContentReliably(options: {
   config?: any;
   timeoutMs?: number;
 }): Promise<any> {
-  const requestedModel = options.model || "gemini-3.5-flash";
+  const requestedModel = options.model || "gemini-2.5-flash";
   const timeoutMs = options.timeoutMs || 15000;
   const now = Date.now();
   
@@ -409,15 +450,15 @@ async function generateContentReliably(options: {
     console.log(`[server] [Circuit Breaker Active] Attempting quick recovery (${remainingSec}s remaining)...`);
   }
 
-  // Build list of valid production Gemini model fallbacks
+  // Canonical Google production models list - covers standard AI Studio API keys
   const availableFallbacks = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
     "gemini-3.5-flash",
     "gemini-3.8-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-flash-lite-latest",
-    "gemini-3.1-flash-lite",
-    "gemini-3-flash-preview",
-    "gemini-3.6-flash",
     "gemini-3.7-flash"
   ];
 
@@ -433,16 +474,17 @@ async function generateContentReliably(options: {
 
   const exhaustedKeys = new Set<string>();
   let lastError: any = null;
-  let hitQuotaError = false;
+  const pool = getGeminiApiKeyPool();
+  const totalKeys = Math.max(1, pool.length);
 
-  // Outer loop: Try available API keys from the pool
-  const totalKeys = Math.max(1, getGeminiApiKeyPool().length);
-  for (let keyAttempt = 0; keyAttempt < Math.min(totalKeys, 4); keyAttempt++) {
+  // Outer loop: Seamlessly try ALL available API keys from the pool (up to totalKeys attempts)
+  for (let keyAttempt = 0; keyAttempt < Math.min(totalKeys, 6); keyAttempt++) {
     const { key, client, poolSize, keyIndex } = getNextHealthyKey(exhaustedKeys);
-    const keyPreview = key ? `...${key.slice(-4)}` : "None";
-    console.log(`[server] [AI Multi-Key] Selected Key ${keyIndex}/${poolSize || 1} (${keyPreview})`);
+    if (!key) break;
+    const keyPreview = key ? `${key.substring(0, 6)}...${key.slice(-4)}` : "None";
+    console.log(`[server] [AI Multi-Key] Selected Key ${keyIndex}/${poolSize} (${keyPreview}) for attempt ${keyAttempt + 1}`);
 
-    let keyHitQuota = false;
+    let keyHitHardError = false;
 
     for (const currentModel of modelsToTry) {
       for (let attempt = 1; attempt <= 2; attempt++) {
@@ -469,24 +511,21 @@ async function generateContentReliably(options: {
           const isQuotaError = errorStr.includes("RESOURCE_EXHAUSTED") || 
                                errorStr.includes("quota") || 
                                errorStr.includes("429");
-          const isPermissionError = errorStr.includes("PERMISSION_DENIED") || errorStr.includes("403");
+          const isPermissionError = errorStr.includes("PERMISSION_DENIED") || 
+                                     errorStr.includes("403") ||
+                                     errorStr.includes("API_KEY_INVALID");
           
-          console.warn(`[server] [AI Attempt Note] Model ${currentModel} (attempt ${attempt}, key: ${keyPreview}): ${error?.message || errorStr?.substring(0, 150)}`);
+          console.warn(`[server] [AI Attempt Note] Model ${currentModel} (key: ${keyPreview}): ${error?.message || errorStr?.substring(0, 150)}`);
 
-          if (isQuotaError) {
-            hitQuotaError = true;
-            keyHitQuota = true;
-            // Mark this specific key in cooldown for 60 seconds
+          if (isQuotaError || isPermissionError) {
+            keyHitHardError = true;
+            // Mark this specific key in cooldown for 60 seconds and fail over to NEXT KEY
             if (key) {
               keyCooldowns.set(key, Date.now() + 60000);
               exhaustedKeys.add(key);
-              console.warn(`[server] [AI Multi-Key Failover] Key ${keyPreview} hit quota (429). Rotating to next key in pool.`);
+              console.warn(`[server] [AI Multi-Key Failover] Key ${keyPreview} hit ${isQuotaError ? 'quota (429)' : 'permission (403)'}. Seamlessly failing over to next key in pool.`);
             }
-            break; // Break model loop, switch to next API key
-          }
-
-          if (isPermissionError && errorStr.includes("identity")) {
-            throw error;
+            break; // Break model loop, rotate immediately to next API key
           }
 
           // If 503 unavailable on attempt 1, brief 500ms pause then retry once
@@ -495,23 +534,20 @@ async function generateContentReliably(options: {
             continue;
           }
 
-          break; // Try next model
+          break; // Try next model in list for this key
         }
       }
 
-      if (keyHitQuota) {
+      if (keyHitHardError) {
         break; // Stop trying models with this quota-exhausted key, rotate to next key in pool
       }
     }
 
-    if (!keyHitQuota) {
-      // If error was not quota-related (e.g. timeout or bad prompt), don't unnecessarily burn all keys
-      break;
-    }
+    exhaustedKeys.add(key);
   }
 
-  if (hitQuotaError && exhaustedKeys.size >= totalKeys) {
-    console.warn(`[server] All ${totalKeys} API keys in pool exhausted quota. Short cooldown (10s).`);
+  if (exhaustedKeys.size >= totalKeys) {
+    console.warn(`[server] All ${totalKeys} API keys in pool attempted. Short cooldown (10s).`);
     quotaCircuitBreakerUntil = Date.now() + 10000;
   }
 
@@ -620,18 +656,17 @@ function cleanJSONResponse(text: string): string {
 }
 
 function mapSelectedModelToGemini(modelName?: string): string {
-  // Map models to available production versions
+  // Map models to canonical universally supported Google production versions
   const model = modelName?.toLowerCase() || "";
   
-  if (model.includes("3.7")) return "gemini-3.7-flash";
-  if (model.includes("3.8")) return "gemini-3.8-flash";
-  if (model.includes("3.5") && model.includes("lite")) return "gemini-3.5-flash-lite";
-  if (model.includes("3.5")) return "gemini-3.5-flash";
-  if (model.includes("3.6")) return "gemini-3.6-flash";
-  if (model.includes("3.1-flash")) return "gemini-3.1-flash-lite";
-  if (model.includes("pro")) return "gemini-3.8-flash"; // Map pro to 3.8-flash high reasoning
+  if (model.includes("2.5") && model.includes("pro")) return "gemini-2.5-pro";
+  if (model.includes("2.5") && model.includes("lite")) return "gemini-2.5-flash-lite";
+  if (model.includes("2.5")) return "gemini-2.5-flash";
+  if (model.includes("2.0")) return "gemini-2.0-flash";
+  if (model.includes("1.5")) return "gemini-1.5-flash";
+  if (model.includes("pro")) return "gemini-2.5-pro";
   
-  return "gemini-3.7-flash"; // Default to latest high performance
+  return "gemini-2.5-flash"; // Canonical production model for Google AI Studio
 }
 
 
@@ -3401,6 +3436,9 @@ Cloud Platform Architecture | Tech: React, Node.js, MongoDB`;
           config: { responseMimeType: "application/json" }
         });
         stage12Data = JSON.parse(cleanJSONResponse(stage12Result.text || "{}"));
+        if (!stage12Data?.atsResult || typeof stage12Data?.atsResult?.score !== 'number') {
+          throw new Error("Invalid ATS structure returned by AI model");
+        }
       } catch (e12: any) {
         console.warn("[server] [Analysis] Stage 1-2 AI notice, applying realistic calibrated analysis:", e12?.message);
         stage12Data = {
@@ -3479,6 +3517,9 @@ Cloud Platform Architecture | Tech: React, Node.js, MongoDB`;
           config: { responseMimeType: "application/json" }
         });
         stage34Data = JSON.parse(cleanJSONResponse(stage34Result.text || "{}"));
+        if (!stage34Data?.marketAnalysis || !stage34Data?.gapAnalysis) {
+          throw new Error("Invalid Market & Gap structure returned by AI model");
+        }
       } catch (e34: any) {
         console.warn("[server] [Analysis] Stage 3-4 AI notice, applying market telemetry:", e34?.message);
         stage34Data = {
@@ -3562,6 +3603,9 @@ Cloud Platform Architecture | Tech: React, Node.js, MongoDB`;
           config: { responseMimeType: "application/json" }
         });
         stage5Data = JSON.parse(cleanJSONResponse(stage5Result.text || "{}"));
+        if (!stage5Data?.sprints || !Array.isArray(stage5Data.sprints) || stage5Data.sprints.length === 0) {
+          throw new Error("Invalid Roadmap structure returned by AI model");
+        }
       } catch (e5: any) {
         console.warn("[server] [Analysis] Stage 5 AI notice, applying curated flight plan:", e5?.message);
         stage5Data = {
@@ -4080,6 +4124,20 @@ Cloud Platform Service | Tech: React, Node.js, MongoDB`;
       mongo: isMongoConnected() ? "connected" : "disconnected",
       env: process.env.NODE_ENV || "development"
     });
+  });
+
+  // Diagnostic endpoint for Gemini API Keys Pool status
+  app.get("/api/system/keys-status", (req, res) => {
+    try {
+      const keysStatus = getGeminiKeysStatus();
+      res.json({
+        ...keysStatus,
+        supportedProductionModels: ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-pro"],
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to inspect keys status" });
+    }
   });
 
   // --- PERSONAL AI MENTOR & TUTOR SYSTEM ---

@@ -20,7 +20,10 @@ import {
   Send,
   X,
   Filter,
-  ExternalLink
+  ExternalLink,
+  Key,
+  Server,
+  Activity
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +39,7 @@ function cn(...classes: any[]) {
 }
 
 export function AdminUsersTab() {
-  const [currentSection, setCurrentSection] = useState<'users' | 'tickets'>('tickets');
+  const [currentSection, setCurrentSection] = useState<'users' | 'tickets' | 'keys'>('tickets');
   
   // Users state
   const [users, setUsers] = useState<any[]>([]);
@@ -54,6 +57,25 @@ export function AdminUsersTab() {
   const [ticketStatusUpdate, setTicketStatusUpdate] = useState<'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'>('RESOLVED');
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
 
+  // Gemini API Keys Pool state
+  const [keysStatus, setKeysStatus] = useState<any>(null);
+  const [loadingKeys, setLoadingKeys] = useState(false);
+
+  const fetchKeysStatus = async () => {
+    setLoadingKeys(true);
+    try {
+      const res = await fetch('/api/system/keys-status');
+      if (res.ok) {
+        const data = await res.json();
+        setKeysStatus(data);
+      }
+    } catch (e: any) {
+      console.warn("Could not load keys status:", e);
+    } finally {
+      setLoadingKeys(false);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -69,6 +91,7 @@ export function AdminUsersTab() {
       ]);
       setUsers(usersData || []);
       setTickets(ticketsData || []);
+      fetchKeysStatus();
     } catch (err: any) {
       console.error("Failed to fetch admin data:", err);
       toast.error(err.message || "Access denied or session expired.");
@@ -237,6 +260,18 @@ export function AdminUsersTab() {
         >
           <Users className="w-4 h-4" />
           <span>Registered Users ({users.length})</span>
+        </button>
+
+        <button
+          onClick={() => { setCurrentSection('keys'); fetchKeysStatus(); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
+            currentSection === 'keys'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          }`}
+        >
+          <Key className="w-4 h-4" />
+          <span>API Keys Pool ({keysStatus?.totalKeysDetected ?? '...'})</span>
         </button>
       </div>
 
@@ -603,6 +638,154 @@ export function AdminUsersTab() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* SECTION 3: GEMINI API KEYS POOL & LOAD-BALANCING STATUS */}
+      {currentSection === 'keys' && (
+        <div className="space-y-6">
+          {/* KPI Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Card className="p-4 rounded-2xl border-indigo-500/20 bg-indigo-500/[0.03] space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-500 block font-mono">Total API Keys</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                  {keysStatus?.totalKeysDetected ?? 0}
+                </span>
+                <span className="text-[10px] text-indigo-500 font-bold">Loaded</span>
+              </div>
+            </Card>
+
+            <Card className="p-4 rounded-2xl border-emerald-500/20 bg-emerald-500/[0.03] space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 block font-mono">Active Target Key</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                  Key #{keysStatus?.activeKeyIndex ?? 1}
+                </span>
+                <span className="text-[10px] text-emerald-600 font-bold">Live</span>
+              </div>
+            </Card>
+
+            <Card className="p-4 rounded-2xl border-purple-500/20 bg-purple-500/[0.03] space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-purple-500 block font-mono">Auto-Failover</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-lg font-black text-purple-600 dark:text-purple-400">Active</span>
+                <span className="text-[10px] text-purple-500 font-bold">429 Protection</span>
+              </div>
+            </Card>
+
+            <Card className="p-4 rounded-2xl border-border bg-card/60 space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block font-mono">Production Model</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm font-black text-foreground truncate">gemini-2.5-flash</span>
+                <span className="text-[10px] text-emerald-500 font-bold">Fast</span>
+              </div>
+            </Card>
+          </div>
+
+          {/* Keys List */}
+          <Card className="p-6 rounded-3xl border-border bg-card/60 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
+              <div>
+                <h3 className="text-base font-black text-foreground flex items-center gap-2">
+                  <Key className="w-5 h-5 text-indigo-500" />
+                  Gemini API Multi-Key Pool & Health
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  The backend automatically routes commands across all 4 keys. If one key hits Google quota (429), it immediately fails over to the next key.
+                </p>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchKeysStatus}
+                disabled={loadingKeys}
+                className="rounded-xl text-xs font-bold self-start sm:self-auto cursor-pointer flex items-center gap-1.5"
+              >
+                <RefreshCw className={cn("w-3.5 h-3.5", loadingKeys && "animate-spin")} />
+                Refresh Keys Status
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {keysStatus?.keys && keysStatus.keys.length > 0 ? (
+                keysStatus.keys.map((k: any, idx: number) => {
+                  const isHealthy = k.status === 'healthy';
+                  return (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "p-4 rounded-2xl border transition-all flex flex-col justify-between space-y-3",
+                        k.isCurrentTarget 
+                          ? "bg-indigo-500/[0.04] border-indigo-500/40 shadow-sm shadow-indigo-500/10" 
+                          : "bg-background border-border/80"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className={cn(
+                            "w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs",
+                            k.isCurrentTarget ? "bg-indigo-600 text-white" : "bg-muted text-muted-foreground"
+                          )}>
+                            #{k.keyIndex}
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-foreground flex items-center gap-2">
+                              Key #{k.keyIndex}
+                              {k.isCurrentTarget && (
+                                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black border border-indigo-500/20">
+                                  CURRENT TARGET
+                                </span>
+                              )}
+                            </h4>
+                            <p className="font-mono text-xs text-muted-foreground tracking-wider mt-0.5">
+                              {k.preview}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span className={cn(
+                          "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border",
+                          isHealthy 
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" 
+                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                        )}>
+                          {k.status}
+                        </span>
+                      </div>
+
+                      <div className="pt-2 border-t border-border/40 text-[11px] text-muted-foreground flex items-center justify-between">
+                        <span>Environment Key Length: {k.length} chars</span>
+                        <span className={cn("font-bold", isHealthy ? "text-emerald-600" : "text-amber-600")}>
+                          {isHealthy ? "✓ Ready to handle requests" : "⏳ Rotating to other keys"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="col-span-2 py-8 text-center space-y-2 bg-muted/20 rounded-2xl border border-dashed border-border">
+                  <Key className="w-8 h-8 text-muted-foreground mx-auto" />
+                  <p className="text-sm font-bold text-foreground">No custom keys detected in pool</p>
+                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                    Make sure to set GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3, GEMINI_API_KEY_4 in Vercel Environment Variables.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Vercel Configuration Guide Box */}
+            <div className="p-4 rounded-2xl bg-muted/30 border border-border/60 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-foreground flex items-center gap-1.5">
+                <Server className="w-3.5 h-3.5 text-primary" />
+                Vercel Environment Setup Tip:
+              </span>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                To guarantee zero downtime and quad-layer rate limit protection on Vercel, ensure you have added all 4 keys in <strong className="text-foreground">Vercel &gt; Project Settings &gt; Environment Variables</strong> as: <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[11px]">GEMINI_API_KEY_1</code>, <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[11px]">GEMINI_API_KEY_2</code>, <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[11px]">GEMINI_API_KEY_3</code>, <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[11px]">GEMINI_API_KEY_4</code>.
+              </p>
+            </div>
+          </Card>
         </div>
       )}
 
