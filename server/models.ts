@@ -113,9 +113,34 @@ const SupportTicketSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// Automatic Crash & Error Telemetry Schema
+const SystemErrorLogSchema = new mongoose.Schema({
+  errorId: { type: String, required: true, unique: true, index: true },
+  type: { 
+    type: String, 
+    enum: ['API_FAILURE', 'GEMINI_QUOTA', 'FRONTEND_CRASH', 'NETWORK_TIMEOUT'], 
+    default: 'API_FAILURE',
+    index: true 
+  },
+  message: { type: String, required: true },
+  pageUrl: { type: String, default: '/' },
+  component: { type: String, default: 'General' },
+  userId: { type: String, default: '' },
+  browserInfo: { type: String, default: '' },
+  severity: { 
+    type: String, 
+    enum: ['CRITICAL', 'WARNING', 'INFO'], 
+    default: 'WARNING',
+    index: true 
+  },
+  resolved: { type: Boolean, default: false, index: true },
+  createdAt: { type: Date, default: Date.now, index: true }
+});
+
 export const User = mongoose.model('User', UserSchema);
 export const Resume = mongoose.model('Resume', ResumeSchema);
 export const AtsResult = mongoose.model('AtsResult', AtsResultSchema);
 export const Roadmap = mongoose.model('Roadmap', RoadmapSchema);
 export const ChatSession = mongoose.model('ChatSession', ChatSessionSchema);
 export const SupportTicket = mongoose.model('SupportTicket', SupportTicketSchema);
+export const SystemErrorLog = mongoose.model('SystemErrorLog', SystemErrorLogSchema);

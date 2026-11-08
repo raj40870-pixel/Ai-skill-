@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { mongoApi, SupportTicket } from '../lib/mongoApi';
+import { mongoApi, SupportTicket, SystemErrorLog, AdminErrorSummary } from '../lib/mongoApi';
 import { 
   Users, 
   Search, 
@@ -23,7 +23,13 @@ import {
   ExternalLink,
   Key,
   Server,
-  Activity
+  Activity,
+  AlertOctagon,
+  Radio,
+  Trash2,
+  Bug,
+  WifiOff,
+  Check
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,8 +44,24 @@ function cn(...classes: any[]) {
   return classes.filter(Boolean).join(' ');
 }
 
+function formatTimeAgo(dateStr: string): string {
+  try {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  } catch {
+    return 'Recent';
+  }
+}
+
 export function AdminUsersTab() {
-  const [currentSection, setCurrentSection] = useState<'users' | 'tickets' | 'keys'>('tickets');
+  const [currentSection, setCurrentSection] = useState<'users' | 'tickets' | 'keys' | 'errors'>('tickets');
   
   // Users state
   const [users, setUsers] = useState<any[]>([]);
@@ -61,6 +83,14 @@ export function AdminUsersTab() {
   const [keysStatus, setKeysStatus] = useState<any>(null);
   const [loadingKeys, setLoadingKeys] = useState(false);
 
+  // Live Error Telemetry Radar state
+  const [errorTelemetry, setErrorTelemetry] = useState<AdminErrorSummary | null>(null);
+  const [loadingErrors, setLoadingErrors] = useState(false);
+  const [errorFilterType, setErrorFilterType] = useState<string>('all');
+  const [errorSearch, setErrorSearch] = useState('');
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [isClearingErrors, setIsClearingErrors] = useState(false);
+
   const fetchKeysStatus = async () => {
     setLoadingKeys(true);
     try {
@@ -73,6 +103,55 @@ export function AdminUsersTab() {
       console.warn("Could not load keys status:", e);
     } finally {
       setLoadingKeys(false);
+    }
+  };
+
+  const fetchErrors = async () => {
+    setLoadingErrors(true);
+    try {
+      const data = await mongoApi.getAdminErrors();
+      setErrorTelemetry(data);
+    } catch (e: any) {
+      console.warn("Could not load error telemetry:", e);
+    } finally {
+      setLoadingErrors(false);
+    }
+  };
+
+  const handleToggleResolveError = async (errorId: string) => {
+    setResolvingId(errorId);
+    try {
+      const res = await mongoApi.resolveAdminError(errorId);
+      toast.success(`Error #${errorId} marked as ${res.resolved ? 'RESOLVED' : 'ACTIVE'}`);
+      fetchErrors();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update error status");
+    } finally {
+      setResolvingId(null);
+    }
+  };
+
+  const handleClearResolvedErrors = async () => {
+    if (!confirm("Are you sure you want to clear resolved error logs?")) return;
+    setIsClearingErrors(true);
+    try {
+      const res = await mongoApi.clearAdminErrors(true);
+      toast.success(`Cleared ${res.deletedCount} resolved logs`);
+      fetchErrors();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to clear logs");
+    } finally {
+      setIsClearingErrors(false);
+    }
+  };
+
+  const handleSendTestPing = async () => {
+    try {
+      await mongoApi.sendTestErrorPing();
+      toast.success("Telemetry Test Ping emitted! Updating radar...");
+      setTimeout(() => fetchErrors(), 300);
+    } catch (err: any) {
+      toast.error("Failed to emit test ping: " + err.message);
     }
   };
 
@@ -92,6 +171,7 @@ export function AdminUsersTab() {
       setUsers(usersData || []);
       setTickets(ticketsData || []);
       fetchKeysStatus();
+      fetchErrors();
     } catch (err: any) {
       console.error("Failed to fetch admin data:", err);
       toast.error(err.message || "Access denied or session expired.");
@@ -103,7 +183,14 @@ export function AdminUsersTab() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+    // Live Radar auto-poll every 25 seconds
+    const interval = setInterval(() => {
+      if (currentSection === 'errors') {
+        fetchErrors();
+      }
+    }, 25000);
+    return () => clearInterval(interval);
+  }, [currentSection]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -232,10 +319,10 @@ export function AdminUsersTab() {
       </div>
 
       {/* Primary Section Switcher Tabs */}
-      <div className="flex items-center gap-3 border-b border-border pb-1">
+      <div className="flex items-center gap-2 border-b border-border pb-1 overflow-x-auto">
         <button
           onClick={() => setCurrentSection('tickets')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
             currentSection === 'tickets'
               ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -251,8 +338,27 @@ export function AdminUsersTab() {
         </button>
 
         <button
+          onClick={() => { setCurrentSection('errors'); fetchErrors(); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
+            currentSection === 'errors'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          }`}
+        >
+          <Radio className="w-4 h-4 text-amber-400 animate-pulse" />
+          <span>Live Error Radar</span>
+          {(errorTelemetry?.unresolvedCount ?? 0) > 0 ? (
+            <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black">
+              {errorTelemetry?.unresolvedCount} Active
+            </span>
+          ) : (
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          )}
+        </button>
+
+        <button
           onClick={() => setCurrentSection('users')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
             currentSection === 'users'
               ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -264,7 +370,7 @@ export function AdminUsersTab() {
 
         <button
           onClick={() => { setCurrentSection('keys'); fetchKeysStatus(); }}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
             currentSection === 'keys'
               ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -786,6 +892,281 @@ export function AdminUsersTab() {
               </p>
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* SECTION 4: LIVE ERROR RADAR & TELEMETRY */}
+      {currentSection === 'errors' && (
+        <div className="space-y-6">
+          {/* Radar KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="p-4 rounded-2xl border-red-500/20 bg-red-500/[0.03] space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-red-500 block font-mono">Errors Today</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-red-600 dark:text-red-400">
+                  {errorTelemetry?.totalToday ?? 0}
+                </span>
+                <span className="text-[10px] text-muted-foreground font-bold">Past 24h</span>
+              </div>
+            </Card>
+
+            <Card className="p-4 rounded-2xl border-amber-500/20 bg-amber-500/[0.03] space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-500 block font-mono">Gemini Quota / 429 Hits</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                  {errorTelemetry?.quotaHits ?? 0}
+                </span>
+                <span className="text-[10px] text-amber-600 font-bold">Rate Limits</span>
+              </div>
+            </Card>
+
+            <Card className="p-4 rounded-2xl border-purple-500/20 bg-purple-500/[0.03] space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-purple-500 block font-mono">Critical Unresolved</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-purple-600 dark:text-purple-400">
+                  {errorTelemetry?.criticalCount ?? 0}
+                </span>
+                <span className="text-[10px] text-purple-600 font-bold">Needs Fix</span>
+              </div>
+            </Card>
+
+            <Card className={cn(
+              "p-4 rounded-2xl space-y-1 border",
+              (errorTelemetry?.criticalCount ?? 0) === 0 
+                ? "border-emerald-500/20 bg-emerald-500/[0.03]" 
+                : "border-rose-500/30 bg-rose-500/[0.04]"
+            )}>
+              <span className="text-[10px] font-black uppercase tracking-wider text-foreground block font-mono">System Health Radar</span>
+              <div className="flex items-center gap-2 pt-0.5">
+                <span className={cn(
+                  "w-3 h-3 rounded-full animate-pulse",
+                  (errorTelemetry?.criticalCount ?? 0) === 0 ? "bg-emerald-500 shadow-md shadow-emerald-500/50" : "bg-rose-500 shadow-md shadow-rose-500/50"
+                )} />
+                <span className={cn(
+                  "text-sm font-black tracking-tight",
+                  (errorTelemetry?.criticalCount ?? 0) === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                )}>
+                  {(errorTelemetry?.criticalCount ?? 0) === 0 ? "All Systems Operational" : "Action Required"}
+                </span>
+              </div>
+            </Card>
+          </div>
+
+          {/* Controls Bar: Filters, Search & Actions */}
+          <Card className="p-4 sm:p-5 rounded-2xl border-border/80 bg-card/60 backdrop-blur-md space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { id: 'all', label: 'All Logs' },
+                  { id: 'unresolved', label: 'Unresolved Only' },
+                  { id: 'GEMINI_QUOTA', label: 'Quota (429)' },
+                  { id: 'API_FAILURE', label: 'API Failures' },
+                  { id: 'FRONTEND_CRASH', label: 'Frontend Crashes' },
+                  { id: 'critical', label: 'Critical Only' }
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setErrorFilterType(f.id)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border",
+                      errorFilterType === f.id
+                        ? "bg-red-600 text-white border-red-600 shadow-sm shadow-red-600/20"
+                        : "bg-muted/50 border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleSendTestPing}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl text-xs font-bold gap-1.5 cursor-pointer border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Send Test Ping</span>
+                </Button>
+
+                <Button
+                  onClick={handleClearResolvedErrors}
+                  disabled={isClearingErrors}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl text-xs font-bold gap-1.5 cursor-pointer text-muted-foreground hover:text-rose-600"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Clear Resolved</span>
+                </Button>
+
+                <Button
+                  onClick={fetchErrors}
+                  disabled={loadingErrors}
+                  size="sm"
+                  className="rounded-xl text-xs font-bold gap-1.5 cursor-pointer bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <RefreshCw className={cn("w-3.5 h-3.5", loadingErrors && "animate-spin")} />
+                  <span>Refresh Radar</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={errorSearch}
+                onChange={(e) => setErrorSearch(e.target.value)}
+                placeholder="Search telemetry by error message, component, URL, or error ID..."
+                className="w-full pl-10 pr-4 py-2 rounded-xl bg-background border border-border text-xs focus:outline-none focus:border-red-500 transition-all font-mono"
+              />
+              {errorSearch && (
+                <button
+                  onClick={() => setErrorSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer text-xs"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </Card>
+
+          {/* Error Logs Feed Table / Cards */}
+          <div className="space-y-3">
+            {(() => {
+              const allLogs = errorTelemetry?.logs || [];
+              const filtered = allLogs.filter((log: SystemErrorLog) => {
+                // Type / Severity filter
+                if (errorFilterType === 'unresolved' && log.resolved) return false;
+                if (errorFilterType === 'critical' && log.severity !== 'CRITICAL') return false;
+                if (errorFilterType === 'GEMINI_QUOTA' && log.type !== 'GEMINI_QUOTA') return false;
+                if (errorFilterType === 'API_FAILURE' && log.type !== 'API_FAILURE') return false;
+                if (errorFilterType === 'FRONTEND_CRASH' && log.type !== 'FRONTEND_CRASH') return false;
+
+                // Search query
+                if (errorSearch) {
+                  const q = errorSearch.toLowerCase();
+                  const inMsg = (log.message || '').toLowerCase().includes(q);
+                  const inComp = (log.component || '').toLowerCase().includes(q);
+                  const inUrl = (log.pageUrl || '').toLowerCase().includes(q);
+                  const inId = (log.errorId || '').toLowerCase().includes(q);
+                  if (!inMsg && !inComp && !inUrl && !inId) return false;
+                }
+                return true;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <Card className="p-12 text-center rounded-2xl border-dashed border-border space-y-2">
+                    <Radio className="w-10 h-10 text-muted-foreground mx-auto opacity-40 animate-pulse" />
+                    <h3 className="font-bold text-foreground text-sm">Radar Clear - No Errors Detected</h3>
+                    <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                      All system calls, resume parses, Gemini requests, and client components are operating normally.
+                    </p>
+                  </Card>
+                );
+              }
+
+              return filtered.map((log: SystemErrorLog) => {
+                const isResolving = resolvingId === log.errorId;
+                const dateObj = new Date(log.createdAt);
+                const timeAgo = formatTimeAgo(log.createdAt);
+
+                const typeBadge = {
+                  GEMINI_QUOTA: { color: 'bg-amber-500/10 text-amber-600 border-amber-500/20', icon: Zap, label: 'Gemini Quota (429)' },
+                  API_FAILURE: { color: 'bg-red-500/10 text-red-600 border-red-500/20', icon: AlertOctagon, label: 'API Failure' },
+                  FRONTEND_CRASH: { color: 'bg-purple-500/10 text-purple-600 border-purple-500/20', icon: Bug, label: 'Frontend Crash' },
+                  NETWORK_TIMEOUT: { color: 'bg-blue-500/10 text-blue-600 border-blue-500/20', icon: WifiOff, label: 'Network Timeout' }
+                }[log.type] || { color: 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20', icon: AlertTriangle, label: log.type };
+
+                const TypeIcon = typeBadge.icon;
+
+                return (
+                  <Card
+                    key={log.errorId}
+                    className={cn(
+                      "p-4 rounded-2xl transition-all border space-y-3",
+                      log.resolved 
+                        ? "opacity-60 bg-muted/20 border-border/50" 
+                        : log.severity === 'CRITICAL'
+                        ? "bg-red-500/[0.02] border-red-500/30 shadow-xs"
+                        : "bg-card border-border/80"
+                    )}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs font-black text-foreground">
+                          #{log.errorId}
+                        </span>
+
+                        <span className={cn("inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border", typeBadge.color)}>
+                          <TypeIcon className="w-3 h-3" />
+                          <span>{typeBadge.label}</span>
+                        </span>
+
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase",
+                          log.severity === 'CRITICAL' ? "bg-red-600 text-white" :
+                          log.severity === 'WARNING' ? "bg-amber-500/20 text-amber-700 dark:text-amber-400" :
+                          "bg-blue-500/20 text-blue-700 dark:text-blue-400"
+                        )}>
+                          {log.severity}
+                        </span>
+
+                        <span className="px-2 py-0.5 rounded-md bg-muted text-[10px] font-bold text-muted-foreground font-mono">
+                          {log.component || 'General'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1 font-mono text-[11px]">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{timeAgo} ({dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})</span>
+                        </span>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={isResolving}
+                          onClick={() => handleToggleResolveError(log.errorId)}
+                          className={cn(
+                            "h-7 px-2.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all border",
+                            log.resolved
+                              ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
+                              : "bg-muted text-muted-foreground border-border hover:text-emerald-600 hover:border-emerald-500/40"
+                          )}
+                        >
+                          <Check className={cn("w-3.5 h-3.5 mr-1", log.resolved ? "text-emerald-600" : "text-muted-foreground")} />
+                          <span>{log.resolved ? "Resolved" : "Mark Resolved"}</span>
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Error Message Box */}
+                    <div className="p-3 rounded-xl bg-muted/40 border border-border/60">
+                      <p className="font-mono text-xs text-foreground whitespace-pre-wrap break-all leading-relaxed">
+                        {log.message}
+                      </p>
+                    </div>
+
+                    {/* Metadata Footer */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground font-mono">
+                      <span>URL: <strong className="text-foreground">{log.pageUrl || '/'}</strong></span>
+                      {log.userId && <span>User: <strong className="text-foreground">{log.userId}</strong></span>}
+                      {log.browserInfo && (
+                        <span className="truncate max-w-xs text-[10px] opacity-70">
+                          {log.browserInfo}
+                        </span>
+                      )}
+                    </div>
+                  </Card>
+                );
+              });
+            })()}
+          </div>
         </div>
       )}
 

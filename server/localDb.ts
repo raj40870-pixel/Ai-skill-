@@ -10,23 +10,25 @@ interface LocalDbData {
   roadmaps: any[];
   chatSessions?: any[];
   supportTickets?: any[];
+  systemErrorLogs?: any[];
 }
 
 function readDb(): LocalDbData {
   try {
     if (!fs.existsSync(DB_FILE)) {
-      const defaultData = { users: [], resumes: [], atsResults: [], roadmaps: [], chatSessions: [], supportTickets: [] };
+      const defaultData = { users: [], resumes: [], atsResults: [], roadmaps: [], chatSessions: [], supportTickets: [], systemErrorLogs: [] };
       fs.writeFileSync(DB_FILE, JSON.stringify(defaultData, null, 2), 'utf8');
       return defaultData;
     }
     const content = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(content || '{"users":[],"resumes":[],"atsResults":[],"roadmaps":[],"chatSessions":[],"supportTickets":[]}');
+    const parsed = JSON.parse(content || '{"users":[],"resumes":[],"atsResults":[],"roadmaps":[],"chatSessions":[],"supportTickets":[],"systemErrorLogs":[]}');
     if (!parsed.chatSessions) parsed.chatSessions = [];
     if (!parsed.supportTickets) parsed.supportTickets = [];
+    if (!parsed.systemErrorLogs) parsed.systemErrorLogs = [];
     return parsed;
   } catch (err) {
     console.error("[localDb] Error reading file:", err);
-    return { users: [], resumes: [], atsResults: [], roadmaps: [], chatSessions: [] };
+    return { users: [], resumes: [], atsResults: [], roadmaps: [], chatSessions: [], supportTickets: [], systemErrorLogs: [] };
   }
 }
 
@@ -391,5 +393,54 @@ export const localDb = {
       return db.supportTickets[index];
     }
     return null;
+  },
+
+  // System Error Telemetry Logs
+  saveSystemErrorLog(log: any) {
+    const db = readDb();
+    if (!db.systemErrorLogs) db.systemErrorLogs = [];
+    const entry = {
+      ...log,
+      resolved: log.resolved ?? false,
+      createdAt: log.createdAt || new Date().toISOString()
+    };
+    db.systemErrorLogs.unshift(entry);
+    // Keep max 500 in local fallback file
+    if (db.systemErrorLogs.length > 500) {
+      db.systemErrorLogs = db.systemErrorLogs.slice(0, 500);
+    }
+    writeDb(db);
+    return entry;
+  },
+
+  getSystemErrorLogs(limit = 100) {
+    const db = readDb();
+    const logs = db.systemErrorLogs || [];
+    return logs.slice(0, limit);
+  },
+
+  resolveSystemErrorLog(errorId: string) {
+    const db = readDb();
+    if (!db.systemErrorLogs) return null;
+    const item = db.systemErrorLogs.find(l => l.errorId === errorId);
+    if (item) {
+      item.resolved = !item.resolved;
+      writeDb(db);
+      return item;
+    }
+    return null;
+  },
+
+  clearSystemErrorLogs(onlyResolved = true) {
+    const db = readDb();
+    if (!db.systemErrorLogs) return 0;
+    const initialCount = db.systemErrorLogs.length;
+    if (onlyResolved) {
+      db.systemErrorLogs = db.systemErrorLogs.filter(l => !l.resolved);
+    } else {
+      db.systemErrorLogs = [];
+    }
+    writeDb(db);
+    return initialCount - db.systemErrorLogs.length;
   }
 };

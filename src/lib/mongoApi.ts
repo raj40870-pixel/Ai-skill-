@@ -37,6 +37,28 @@ export interface SupportTicket {
   updatedAt: string;
 }
 
+export interface SystemErrorLog {
+  _id?: string;
+  errorId: string;
+  type: 'API_FAILURE' | 'GEMINI_QUOTA' | 'FRONTEND_CRASH' | 'NETWORK_TIMEOUT';
+  message: string;
+  pageUrl: string;
+  component: string;
+  userId?: string;
+  browserInfo?: string;
+  severity: 'CRITICAL' | 'WARNING' | 'INFO';
+  resolved: boolean;
+  createdAt: string;
+}
+
+export interface AdminErrorSummary {
+  totalToday: number;
+  criticalCount: number;
+  quotaHits: number;
+  unresolvedCount: number;
+  logs: SystemErrorLog[];
+}
+
 class MongoApiService {
   private tokenKey = 'careernav_jwt_token';
 
@@ -584,6 +606,57 @@ class MongoApiService {
       throw new Error(data.error || 'Failed to update ticket');
     }
     return data;
+  }
+
+  // --- AUTOMATIC ERROR TELEMETRY & LIVE RADAR API ---
+  async getAdminErrors(): Promise<AdminErrorSummary> {
+    const response = await fetch(`${BASE_URL}/api/admin/errors`, {
+      headers: this.getHeaders()
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Failed to fetch system error telemetry');
+    }
+    return await response.json();
+  }
+
+  async resolveAdminError(errorId: string): Promise<{ success: boolean; errorId: string; resolved: boolean }> {
+    const response = await fetch(`${BASE_URL}/api/admin/errors/${encodeURIComponent(errorId)}/resolve`, {
+      method: 'POST',
+      headers: this.getHeaders()
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to toggle error resolution');
+    }
+    return data;
+  }
+
+  async clearAdminErrors(onlyResolved = true): Promise<{ success: boolean; deletedCount: number }> {
+    const response = await fetch(`${BASE_URL}/api/admin/errors/clear?all=${!onlyResolved}`, {
+      method: 'DELETE',
+      headers: this.getHeaders()
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to clear error logs');
+    }
+    return data;
+  }
+
+  async sendTestErrorPing(): Promise<any> {
+    const response = await fetch(`${BASE_URL}/api/telemetry/errors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'API_FAILURE',
+        message: 'Admin Radar Test Ping: Telemetry communication verified at ' + new Date().toLocaleTimeString(),
+        component: 'AdminRadarDiagnostic',
+        pageUrl: '/admin',
+        severity: 'INFO'
+      })
+    });
+    return await response.json();
   }
 }
 
