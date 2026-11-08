@@ -203,20 +203,20 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
   const handleFile = async (file: File) => {
     if (!file) return;
 
-    // Check if 7-day scan credit limit is reached (admins are exempt)
-    if (!isAdmin && usage && usage.plan !== 'PREMIUM' && usage.availableCredits <= 0) {
-      const daysLeft = Math.max(1, Math.ceil((new Date(usage.resetDate || Date.now()).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-      const resetStr = usage.resetDate ? new Date(usage.resetDate).toLocaleDateString() : `${daysLeft} days`;
-      toast.error(`7-Day Free Scan Limit Reached (3/3 Used). Quota resets on ${resetStr}.`);
-      setError(`आपकी 3 फ्री रिज्यूमे स्कैनिंग लिमिट पूरी हो चुकी है। आपकी यह लिमिट ${resetStr} को ऑटोमैटिकली रीसेट होगी। कृपया वापस आने तक इंतज़ार करें।`);
+    // Check if free storage limit of 3 is exceeded (admins are exempt)
+    if (!isAdmin && savedCount >= FREE_RESUME_LIMIT) {
+      toast.error(`3 History Slots Full (${savedCount}/${FREE_RESUME_LIMIT}). Please delete an older resume in History first.`);
+      setError(`आपके 3 फ्री रिज्यूमे स्लॉट्स भर चुके हैं (${savedCount}/${FREE_RESUME_LIMIT})। नया रिज्यूमे अपलोड करने के लिए कृपया Career History में जाकर पुराना रिज्यूमे डिलीट करें।`);
       setStatus('error');
       return;
     }
 
-    // Check if free storage limit of 3 is exceeded (admins are exempt)
-    if (!isAdmin && savedCount >= FREE_RESUME_LIMIT) {
-      toast.error(`3 History Slots Full. Please delete an older resume in History first.`);
-      setError(`आपके 3 फ्री रिज्यूमे स्लॉट्स भर चुके हैं (${savedCount}/${FREE_RESUME_LIMIT})। नया रिज्यूमे अपलोड करने के लिए कृपया Career History में जाकर पुराना रिज्यूमे डिलीट करें।`);
+    // Check if 7-day scan credit limit is reached only if user has actually filled all 3 slots
+    if (!isAdmin && usage && usage.plan !== 'PREMIUM' && usage.availableCredits <= 0 && savedCount >= FREE_RESUME_LIMIT) {
+      const daysLeft = Math.max(1, Math.ceil((new Date(usage.resetDate || Date.now()).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+      const resetStr = usage.resetDate ? new Date(usage.resetDate).toLocaleDateString() : `${daysLeft} days`;
+      toast.error(`7-Day Free Scan Limit Reached (3/3 Used). Quota resets on ${resetStr}.`);
+      setError(`आपकी 3 फ्री रिज्यूमे स्कैनिंग लिमिट पूरी हो चुकी है। आपकी यह लिमिट ${resetStr} को ऑटोमैटिकली रीसेट होगी। कृपया वापस आने तक इंतज़ार करें।`);
       setStatus('error');
       return;
     }
@@ -297,7 +297,7 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
     }
   };
 
-  const isCreditLimitReached = !isAdmin && usage !== null && usage.plan !== 'PREMIUM' && usage.availableCredits <= 0;
+  const isCreditLimitReached = !isAdmin && usage !== null && usage.plan !== 'PREMIUM' && usage.availableCredits <= 0 && savedCount >= FREE_RESUME_LIMIT;
   const isStorageLimitReached = !isAdmin && savedCount >= FREE_RESUME_LIMIT;
 
   return (

@@ -603,6 +603,25 @@ async function checkAndIncrementUsage(uid: string, shouldIncrement: boolean = tr
   
   const diffDays = (now.getTime() - windowStart.getTime()) / (1000 * 3600 * 24);
 
+  // Count actual completed resumes saved in DB
+  let actualSavedCount = 0;
+  try {
+    if (mongoose.connection.readyState === 1) {
+      actualSavedCount = await Resume.countDocuments({ userId: uid });
+    } else {
+      actualSavedCount = (localDb.getResumes(uid) || []).length;
+    }
+  } catch (cErr: any) {
+    console.warn("[server] Resume count lookup warning:", cErr?.message);
+  }
+
+  // Self-heal: If user has fewer completed resumes saved than analysisCount (e.g. from failed attempts), reconcile!
+  const effectiveAnalysisCount = Math.min(usage.analysisCount || 0, actualSavedCount);
+  if ((usage.analysisCount || 0) > actualSavedCount) {
+    console.log(`[server] [Quota Self-Heal] Reconciled user ${uid} analysisCount from ${usage.analysisCount} down to ${actualSavedCount} actual resumes.`);
+    await updateUserUsage(uid, { 'usage.analysisCount': actualSavedCount });
+  }
+
   // Reset window if more than 7 days passed
   if (diffDays >= 7) {
     if (shouldIncrement) {
@@ -614,20 +633,32 @@ async function checkAndIncrementUsage(uid: string, shouldIncrement: boolean = tr
     }
   }
 
-  if (usage.analysisCount >= 3) {
+  // If user actually has empty history slots (< 3), never block them!
+  if (actualSavedCount < 3) {
+    if (shouldIncrement) {
+      const newCount = Math.min(3, effectiveAnalysisCount + 1);
+      await updateUserUsage(uid, { 'usage.analysisCount': newCount });
+      const resetDate = new Date(windowStart.getTime() + 7 * 24 * 3600 * 1000);
+      return { allowed: true, remaining: Math.max(0, 3 - newCount), resetDate };
+    }
+    const resetDate = new Date(windowStart.getTime() + 7 * 24 * 3600 * 1000);
+    return { allowed: true, remaining: Math.max(0, 3 - effectiveAnalysisCount), resetDate };
+  }
+
+  if (effectiveAnalysisCount >= 3) {
     const resetDate = new Date(windowStart.getTime() + 7 * 24 * 3600 * 1000);
     return { allowed: false, remaining: 0, resetDate };
   }
 
   if (shouldIncrement) {
-    const newCount = (usage.analysisCount || 0) + 1;
+    const newCount = effectiveAnalysisCount + 1;
     await updateUserUsage(uid, { 'usage.analysisCount': newCount });
     const resetDate = new Date(windowStart.getTime() + 7 * 24 * 3600 * 1000);
     return { allowed: true, remaining: 3 - newCount, resetDate };
   }
   
   const resetDate = new Date(windowStart.getTime() + 7 * 24 * 3600 * 1000);
-  return { allowed: true, remaining: 3 - (usage.analysisCount || 0), resetDate };
+  return { allowed: true, remaining: 3 - effectiveAnalysisCount, resetDate };
 }
 
 
@@ -1201,6 +1232,23 @@ async function startServer() {
       if (diffDays >= 7) {
         currentCount = 0;
         effectiveWindowStart = now;
+      }
+
+      // Reconcile with actual completed resumes in DB so failed attempts don't steal user quota
+      let actualSavedCount = 0;
+      try {
+        if (mongoose.connection.readyState === 1) {
+          actualSavedCount = await Resume.countDocuments({ userId: uid });
+        } else {
+          actualSavedCount = (localDb.getResumes(uid) || []).length;
+        }
+      } catch (e: any) {
+        console.warn("[server] Actual resume count error in usage:", e?.message);
+      }
+
+      if (currentCount > actualSavedCount) {
+        currentCount = actualSavedCount;
+        updateUserUsage(uid, { 'usage.analysisCount': actualSavedCount }).catch(() => {});
       }
 
       const isAdmin = user.email && ADMIN_EMAILS.includes(user.email.toLowerCase().trim());
@@ -2535,9 +2583,11 @@ async function startServer() {
         const roadDel = await Roadmap.deleteMany({ userId: cleanUid });
         console.log(`[server] [History] Deleted: ${resDel.deletedCount} resumes, ${atsDel.deletedCount} ATS results, ${roadDel.deletedCount} roadmaps`);
         localDb.deleteAllResumes(cleanUid);
+        await updateUserUsage(cleanUid, { 'usage.analysisCount': 0 });
         res.json({ success: true, count: resDel.deletedCount });
       } else {
         localDb.deleteAllResumes(cleanUid);
+        await updateUserUsage(cleanUid, { 'usage.analysisCount': 0 });
         res.json({ success: true });
       }
     } catch (err: any) {
@@ -2588,13 +2638,38 @@ async function startServer() {
         // Also cleanup in localDb if present
         localDb.deleteResume(cleanUid, cleanId);
 
-        res.json({ success: true, deletedCount });
+        // Immediately update usage.analysisCount to match remaining resumes count
+        const remainingCount = await Resume.countDocuments({ userId: cleanUid });
+        await updateUserUsage(cleanUid, { 'usage.analysisCount': remainingCount });
+        console.log(`[server] [History] Auto-restored token/slot: user ${cleanUid} now has ${remainingCount} resumes`);
+
+        res.json({ success: true, deletedCount, remainingCount });
       } else {
         localDb.deleteResume(cleanUid, cleanId);
-        res.json({ success: true, deletedCount: 1 });
+        const remainingCount = (localDb.getResumes(cleanUid) || []).length;
+        await updateUserUsage(cleanUid, { 'usage.analysisCount': remainingCount });
+        res.json({ success: true, deletedCount: 1, remainingCount });
       }
     } catch (err: any) {
       console.error(`[server] Single resume delete failed: ${err.message}`);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Emergency quota reset/heal endpoint
+  app.post("/api/users/:uid/reset-usage", async (req, res) => {
+    try {
+      const { uid } = req.params;
+      const cleanUid = (uid || "").trim();
+      let actualCount = 0;
+      if (isMongoConnected()) {
+        actualCount = await Resume.countDocuments({ userId: cleanUid });
+      } else {
+        actualCount = (localDb.getResumes(cleanUid) || []).length;
+      }
+      await updateUserUsage(cleanUid, { 'usage.analysisCount': actualCount });
+      res.json({ success: true, analysisCount: actualCount, availableCredits: Math.max(0, 3 - actualCount) });
+    } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
@@ -2773,11 +2848,6 @@ async function startServer() {
             responseMimeType: "application/json",
           },
         });
-
-        // Deduct credit only on successful completion
-        if (uid) {
-          await checkAndIncrementUsage(uid, true);
-        }
 
         res.json(JSON.parse(cleanJSONResponse(response.text || "{}")));
       } catch (aiError: any) {
