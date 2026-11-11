@@ -360,11 +360,29 @@ export default function App() {
       return;
     }
 
+    setIsProcessing(true);
+    const toastId = toast.loading("Gemini AI analyzing candidate background & extracting work profile...");
+
     try {
-      const tLower = (data.text || '').toLowerCase();
-      let detectedTarget = data.detectedRole || "";
-      
+      let parsed: any;
+      try {
+        console.log("[App] Calling Gemini AI to parse resume...");
+        parsed = await geminiService.parseResume(data.text, user?.uid);
+        console.log("[App] Gemini AI parsed candidate:", parsed);
+      } catch (parseErr: any) {
+        console.warn("[App] Gemini parse note:", parseErr?.message);
+        parsed = null;
+      }
+
+      let detectedTarget = "";
+      if (parsed?.experience && Array.isArray(parsed.experience) && parsed.experience[0]?.role) {
+        detectedTarget = parsed.experience[0].role;
+      } else if (data.detectedRole) {
+        detectedTarget = data.detectedRole;
+      }
+
       if (!detectedTarget) {
+        const tLower = (data.text || '').toLowerCase();
         if (tLower.includes("data scientist") || tLower.includes("machine learning")) detectedTarget = "Data Scientist";
         else if (tLower.includes("data analyst")) detectedTarget = "Data Analyst";
         else if (tLower.includes("frontend") || tLower.includes("react developer")) detectedTarget = "Frontend Developer";
@@ -382,7 +400,7 @@ export default function App() {
       }
 
       setPendingResumeData(data);
-      setPendingParsedData({
+      setPendingParsedData(parsed || {
         skills: [],
         experience: [{ role: detectedTarget, company: "", years: 2, bullets: [] }],
         education: [],
@@ -393,12 +411,14 @@ export default function App() {
       setTargetRole(detectedTarget);
       setTargetRegion("Global");
 
-      // Instantly open Target Role Selection modal without waiting for background API calls!
+      toast.success(`AI Identified Profile: ${detectedTarget}`, { id: toastId });
+
+      // Open Target Role Selection modal with real AI-detected role!
       setIsProcessing(false);
       setIsOnboardingPromptingTarget(true);
     } catch (err: any) {
       console.error(err);
-      toast.error(`Initial resume processing notice: ${err.message || 'Unknown error'}`);
+      toast.dismiss(toastId);
       setIsProcessing(false);
     }
   };
