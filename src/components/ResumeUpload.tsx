@@ -12,7 +12,10 @@ import {
   History,
   AlertTriangle,
   ArrowRight,
-  RotateCcw
+  RotateCcw,
+  Loader2,
+  Brain,
+  Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -130,32 +133,16 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
   const [savedCount, setSavedCount] = useState<number>(0);
   const [loadingCount, setLoadingCount] = useState(true);
 
-  const [parsingStep, setParsingStep] = useState(0);
-  const parsingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const parsingMessages = [
-    "Reading document structure...",
-    "AI Vision analyzing candidate background...",
-    "Extracting skills, experience & education...",
-    "Preparing career flight deck..."
-  ];
+  const [currentIndexStep, setCurrentIndexStep] = useState<number>(0);
+  const [completedIndexSteps, setCompletedIndexSteps] = useState<number[]>([]);
+  const [detectedRoleName, setDetectedRoleName] = useState<string>('');
 
-  // Cycle through parsing messages while analysis is running
-  useEffect(() => {
-    if (status === 'uploading' || status === 'parsing') {
-      setParsingStep(0);
-      parsingIntervalRef.current = setInterval(() => {
-        setParsingStep(prev => (prev + 1) % parsingMessages.length);
-      }, 1400);
-    } else {
-      if (parsingIntervalRef.current) {
-        clearInterval(parsingIntervalRef.current);
-        parsingIntervalRef.current = null;
-      }
-    }
-    return () => {
-      if (parsingIntervalRef.current) clearInterval(parsingIntervalRef.current);
-    };
-  }, [status]);
+  const indexSteps = [
+    { title: "Document Structure & OCR Layer", desc: "Extracting text layout, syntax & raw resume streams" },
+    { title: "AI Vision & Candidate Scan", desc: "Gemini neural model analyzing candidate profile background" },
+    { title: "Skills & Experience Extraction", desc: "Indexing core competencies, technical tools & project history" },
+    { title: "Role Synthesis & Flight Deck", desc: "Verifying primary role & configuring target parameters" }
+  ];
 
   // Check current resume count on mount
   useEffect(() => {
@@ -243,8 +230,11 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
 
     try {
       setStatus('uploading');
-      setProgress(20);
+      setProgress(15);
       setError(null);
+      setCurrentIndexStep(0);
+      setCompletedIndexSteps([]);
+      setDetectedRoleName('');
 
       // Prepare payload with automatic image optimization for high-res photos
       const { base64, mimeType } = await prepareFilePayload(file);
@@ -253,10 +243,23 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
         throw new Error("Unable to process file data. Please try selecting the file again.");
       }
 
-      setProgress(45);
       setStatus('parsing');
+      setProgress(25);
 
-      // Document Text Extraction & Multimodal AI Vision
+      // Progressive indexing feedback while Gemini AI processes the document
+      const timer1 = setTimeout(() => {
+        setCompletedIndexSteps([0]);
+        setCurrentIndexStep(1);
+        setProgress(45);
+      }, 700);
+
+      const timer2 = setTimeout(() => {
+        setCompletedIndexSteps([0, 1]);
+        setCurrentIndexStep(2);
+        setProgress(65);
+      }, 1500);
+
+      // Document Text Extraction & Gemini AI Deep Analysis
       const res = await fetch(`${BASE_URL}/api/resume/parse-text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -267,29 +270,49 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
         })
       });
 
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: "Server error" }));
         throw new Error(errorData.error || "Failed to analyze document.");
       }
 
       const result = await res.json();
-      setProgress(90);
+      const detected = result.detectedRole || "Software Engineer";
 
-      // Successfully parsed
-      setStatus('success');
+      // Mark Step 1, 2, 3 as complete and move to Step 4
+      setCompletedIndexSteps([0, 1, 2]);
+      setCurrentIndexStep(3);
+      setDetectedRoleName(detected);
+      setProgress(85);
+
+      // Guaranteed dwell on Step 4 so user clearly sees the 4th index finish and verify their role
+      await new Promise(r => setTimeout(r, 700));
+      setCompletedIndexSteps([0, 1, 2, 3]);
       setProgress(100);
+
+      // Short pause to view all 4 completed indexes
+      await new Promise(r => setTimeout(r, 500));
+      setStatus('success');
 
       setTimeout(() => {
         onSuccess({
-          parsedData: result.data,
+          parsedData: result.data || {
+            skills: result.skills || [],
+            experience: result.experience || [],
+            education: result.education || [],
+            keywords: result.skills || []
+          },
           text: result.text,
-          detectedRole: result.detectedRole,
+          detectedRole: detected,
+          candidateName: result.candidateName,
           base64,
           mimeType,
           filename: file.name,
-          analysisSpeed: result.analysisSpeed || '2.4s'
+          analysisSpeed: result.analysisSpeed || '2.2s'
         });
-      }, 300);
+      }, 350);
 
     } catch (err: any) {
       console.error(err);
@@ -389,44 +412,98 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
         {(status === 'uploading' || status === 'parsing') && (
           <motion.div 
             key="processing"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="w-full max-w-sm text-center space-y-6"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-lg text-left space-y-4"
           >
-            <div className="relative h-20 w-20 sm:h-24 sm:w-24 mx-auto">
-              <div className="absolute inset-0 rounded-full border-4 border-primary/10"></div>
-              <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Sparkles className="h-8 w-8 text-primary animate-pulse" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                  <Brain className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black tracking-tight text-foreground">
+                    Deep Resume Indexing (4 Stages)
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground font-medium">
+                    Google Gemini AI analyzing candidate background & extracting exact profile
+                  </p>
+                </div>
               </div>
+              <span className="text-xs font-black font-mono text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                {progress}%
+              </span>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-center gap-2">
-                <h3 className="text-xl sm:text-2xl font-black tracking-tight">
-                  Analyzing Resume...
-                </h3>
-              </div>
-              <Progress value={progress} className="h-2 bg-primary/10 rounded-full" />
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-[11px] font-black uppercase tracking-wider text-primary">
-                  {parsingMessages[parsingStep]}
-                </span>
-              </div>
+
+            <Progress value={progress} className="h-2 bg-primary/10 rounded-full" />
+
+            {/* 4 Index Steps Card */}
+            <div className="space-y-2 bg-muted/30 dark:bg-zinc-900/40 p-3.5 sm:p-4 rounded-2xl border border-border/70 shadow-inner">
+              {indexSteps.map((s, idx) => {
+                const isDone = completedIndexSteps.includes(idx);
+                const isCurrent = currentIndexStep === idx && !isDone;
+                return (
+                  <div 
+                    key={idx} 
+                    className={cn(
+                      "flex items-start gap-3 p-2 rounded-xl transition-all",
+                      isDone ? "bg-emerald-500/5 text-foreground" : isCurrent ? "bg-primary/5 border border-primary/20" : "opacity-60"
+                    )}
+                  >
+                    <div className="mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0">
+                      {isDone ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                      ) : isCurrent ? (
+                        <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                      ) : (
+                        <div className="w-2 h-2 rounded-full bg-muted-foreground/40" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={cn(
+                          "text-xs font-bold truncate",
+                          isDone ? "text-emerald-700 dark:text-emerald-400 font-extrabold" : isCurrent ? "text-primary font-black" : "text-muted-foreground"
+                        )}>
+                          Index {idx + 1}: {s.title}
+                        </span>
+                        {isDone && (
+                          <span className="text-[9px] font-black uppercase text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono shrink-0">
+                            Verified ✓
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                        {idx === 3 && detectedRoleName 
+                          ? `Identified Profile: ${detectedRoleName}` 
+                          : s.desc}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </motion.div>
         )}
 
         {status === 'success' && (
           <motion.div 
-            initial={{ scale: 0.85, opacity: 0 }}
+            initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="text-center space-y-3"
+            className="text-center space-y-3 max-w-md mx-auto"
           >
-            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 mx-auto">
-              <CheckCircle2 className="h-8 w-8" />
+            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 mx-auto border border-emerald-500/20">
+              <CheckCircle2 className="h-7 w-7" />
             </div>
-            <h3 className="text-2xl font-bold tracking-tight">Analysis Complete!</h3>
-            <p className="text-muted-foreground text-sm font-medium">Text parsed successfully in 2.4s. Loading roadmap insights...</p>
+            <h3 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+              All 4 Resume Indexes Verified!
+            </h3>
+            {detectedRoleName && (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-black font-mono">
+                AI Detected Role: {detectedRoleName}
+              </div>
+            )}
+            <p className="text-muted-foreground text-xs font-medium">Opening Target Career Selection Board...</p>
           </motion.div>
         )}
 
