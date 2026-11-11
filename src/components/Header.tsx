@@ -35,7 +35,8 @@ interface HeaderProps {
 
 const ADMIN_EMAILS = [
   "kamaljit444501@gmail.com",
-  "kamaljit44501@gmail.com"
+  "kamaljit44501@gmail.com",
+  "raj40870@gmail.com"
 ];
 
 export function Header({ activeTab, onTabChange, onLogout, user }: HeaderProps) {

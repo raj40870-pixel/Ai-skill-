@@ -120,7 +120,7 @@ const prepareFilePayload = async (file: File): Promise<{ base64: string; mimeTyp
   }
 };
 
-const FREE_RESUME_LIMIT = 3;
+const FREE_RESUME_LIMIT = 10;
 
 export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -283,12 +283,13 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
         onSuccess({
           parsedData: result.data,
           text: result.text,
+          detectedRole: result.detectedRole,
           base64,
           mimeType,
           filename: file.name,
           analysisSpeed: result.analysisSpeed || '2.4s'
         });
-      }, 400);
+      }, 300);
 
     } catch (err: any) {
       console.error(err);

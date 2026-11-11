@@ -37,7 +37,8 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 
 const ADMIN_EMAILS = [
-  "kamaljit444501@gmail.com"
+  "kamaljit444501@gmail.com",
+  "raj40870@gmail.com"
 ];
 
 function cn(...classes: any[]) {

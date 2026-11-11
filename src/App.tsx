@@ -352,60 +352,53 @@ export default function App() {
     setAppState('landing');
   };
 
-  const handleUploadSuccess = async (data: { text: string; filename: string; userId: string; extractionMethod?: string }) => {
+  const handleUploadSuccess = async (data: { text: string; filename: string; userId: string; detectedRole?: string; extractionMethod?: string }) => {
     if (!user || !user.uid || user.email === 'guest@careernav.ai') {
       toast.error("Please sign in or create an account to analyze your resume.");
       setAppState('auth');
       setIsProcessing(false);
       return;
     }
-    setIsProcessing(true);
-    try {
-      let parsed;
-      try {
-        parsed = await geminiService.parseResume(data.text, user?.uid);
-      } catch (parseErr) {
-        console.warn("[App] Gemini parse warning, using structured text parser:", parseErr);
-        const tLower = (data.text || '').toLowerCase();
-        let detected = "Software Engineer";
-        if (tLower.includes("data scientist") || tLower.includes("machine learning")) detected = "Data Scientist";
-        else if (tLower.includes("data analyst")) detected = "Data Analyst";
-        else if (tLower.includes("frontend") || tLower.includes("react developer")) detected = "Frontend Developer";
-        else if (tLower.includes("backend") || tLower.includes("node developer")) detected = "Backend Developer";
-        else if (tLower.includes("full stack")) detected = "Full Stack Developer";
-        else if (tLower.includes("devops") || tLower.includes("cloud engineer") || tLower.includes("sre")) detected = "DevOps Engineer";
-        else if (tLower.includes("product manager")) detected = "Product Manager";
-        else if (tLower.includes("ui/ux") || tLower.includes("designer")) detected = "UI/UX Designer";
-        else if (tLower.includes("qa") || tLower.includes("test engineer")) detected = "QA Engineer";
-        else if (tLower.includes("civil engineer")) detected = "Civil Engineer";
-        else if (tLower.includes("mechanical")) detected = "Mechanical Engineer";
-        else if (tLower.includes("financial") || tLower.includes("accountant")) detected = "Financial Analyst";
-        else if (tLower.includes("cybersecurity") || tLower.includes("security")) detected = "Cybersecurity Analyst";
 
-        parsed = {
-          skills: ["Problem Solving", "Communication", "Project Execution", "Technical Analysis", "Git"],
-          experience: [{ role: detected, company: "Professional Practice", years: 2, bullets: ["Executed core responsibilities and deliverables for target domain."] }],
-          education: [{ degree: "Bachelor's Degree", institute: "Accredited University", year: 2022 }],
-          projects: [{ name: "Target Domain Initiative", tech: ["Core Tools"], desc: "Executed domain project with verifiable impact." }],
-          keywords: [detected, "Professional", "Technical"]
-        };
-      }
-      setPendingResumeData(data);
-      setPendingParsedData(parsed);
+    try {
+      const tLower = (data.text || '').toLowerCase();
+      let detectedTarget = data.detectedRole || "";
       
-      const currentRole = parsed.experience?.[0]?.role || "Software Engineer";
-      // Don't auto-prefix with Senior unless it's clearly detected or user selects it later
-      const detectedTarget = currentRole;
+      if (!detectedTarget) {
+        if (tLower.includes("data scientist") || tLower.includes("machine learning")) detectedTarget = "Data Scientist";
+        else if (tLower.includes("data analyst")) detectedTarget = "Data Analyst";
+        else if (tLower.includes("frontend") || tLower.includes("react developer")) detectedTarget = "Frontend Developer";
+        else if (tLower.includes("backend") || tLower.includes("node developer")) detectedTarget = "Backend Developer";
+        else if (tLower.includes("full stack")) detectedTarget = "Full Stack Developer";
+        else if (tLower.includes("devops") || tLower.includes("cloud engineer") || tLower.includes("sre")) detectedTarget = "DevOps Engineer";
+        else if (tLower.includes("product manager")) detectedTarget = "Product Manager";
+        else if (tLower.includes("ui/ux") || tLower.includes("designer")) detectedTarget = "UI/UX Designer";
+        else if (tLower.includes("qa") || tLower.includes("test engineer")) detectedTarget = "QA Engineer";
+        else if (tLower.includes("civil engineer")) detectedTarget = "Civil Engineer";
+        else if (tLower.includes("mechanical")) detectedTarget = "Mechanical Engineer";
+        else if (tLower.includes("financial") || tLower.includes("accountant")) detectedTarget = "Financial Analyst";
+        else if (tLower.includes("cybersecurity") || tLower.includes("security")) detectedTarget = "Cybersecurity Analyst";
+        else detectedTarget = "Software Engineer";
+      }
+
+      setPendingResumeData(data);
+      setPendingParsedData({
+        skills: [],
+        experience: [{ role: detectedTarget, company: "", years: 2, bullets: [] }],
+        education: [],
+        projects: [],
+        keywords: [detectedTarget]
+      });
 
       setTargetRole(detectedTarget);
       setTargetRegion("Global");
-      
-      // Stop full-screen spinner and open Target Role Selection modal for user confirmation
+
+      // Instantly open Target Role Selection modal without waiting for background API calls!
       setIsProcessing(false);
       setIsOnboardingPromptingTarget(true);
     } catch (err: any) {
       console.error(err);
-      toast.error(`Initial resume parsing failed: ${err.message || 'Unknown error'}`);
+      toast.error(`Initial resume processing notice: ${err.message || 'Unknown error'}`);
       setIsProcessing(false);
     }
   };
@@ -989,7 +982,8 @@ export default function App() {
                         isAdmin={Boolean(
                           user && (
                             (user.email && [
-                              "kamaljit444501@gmail.com"
+                              "kamaljit444501@gmail.com",
+                              "raj40870@gmail.com"
                             ].includes(user.email.toLowerCase())) ||
                             user.plan === 'ENTERPRISE_ADMIN' ||
                             user.plan === 'ADMIN' ||
@@ -1009,7 +1003,8 @@ export default function App() {
                         onClearAllHistory={handleClearAllHistory}
                         onNavigate={(tab) => setActiveTab(tab)}
                         isAdmin={!!(user?.email && [
-                          "kamaljit444501@gmail.com"
+                          "kamaljit444501@gmail.com",
+                          "raj40870@gmail.com"
                         ].includes(user.email.toLowerCase())) || user?.plan === 'ADMIN' || user?.isAdmin === true}
                       />
                     </motion.div>
