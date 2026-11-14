@@ -1,35 +1,43 @@
 const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { mongoApi, MongoUser } from './lib/mongoApi';
-import { ResumeUpload } from './components/ResumeUpload';
-import { SalaryInsightsTab } from './components/SalaryInsightsTab';
-import { CareerRoadmapTab } from './components/CareerRoadmapTab';
-import { SkillGapTab } from './components/SkillGapTab';
-import { LearningResourcesTab } from './components/LearningResourcesTab';
 import { geminiService, ATSResult, RoadmapData } from './services/geminiService';
 import { generateOnTheFlyRoadmap } from './lib/marketTelemetry';
 import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
-import { LogOut, Sparkles, Zap, Target, Briefcase, Github, Linkedin, LifeBuoy, CheckCircle2 } from 'lucide-react';
+import { LogOut, Sparkles, Zap, Target, Briefcase, Github, Linkedin, LifeBuoy, CheckCircle2, Loader2 } from 'lucide-react';
 import { cn, getUserCleanName } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { LandingPage } from './components/LandingPage';
 import { Header } from './components/Header';
-import { ProcessingView } from './components/ProcessingView';
-import { LoginView } from './components/LoginView';
-import { HistoryTab } from './components/HistoryTab';
-import { InterviewPrepTab } from './components/InterviewPrepTab';
-import { ProfileTab } from './components/ProfileTab';
-import { SettingsTab } from './components/SettingsTab';
-import { UploadResumeTab } from './components/UploadResumeTab';
-import { Dashboard } from './components/Dashboard';
-import { ATSScoreTab } from './components/ATSScoreTab';
-import { AdminUsersTab } from './components/AdminUsersTab';
-import MentorshipTab from './components/MentorshipTab';
-import { LegalAndInfoModal, ModalType } from './components/LegalAndInfoModal';
-import { SupportDeskModal } from './components/SupportDeskModal';
+import type { ModalType } from './components/LegalAndInfoModal';
+
+const ResumeUpload = lazy(() => import('./components/ResumeUpload').then(m => ({ default: m.ResumeUpload })));
+const ProcessingView = lazy(() => import('./components/ProcessingView').then(m => ({ default: m.ProcessingView })));
+const LoginView = lazy(() => import('./components/LoginView').then(m => ({ default: m.LoginView })));
+const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
+const ATSScoreTab = lazy(() => import('./components/ATSScoreTab').then(m => ({ default: m.ATSScoreTab })));
+const SalaryInsightsTab = lazy(() => import('./components/SalaryInsightsTab').then(m => ({ default: m.SalaryInsightsTab })));
+const CareerRoadmapTab = lazy(() => import('./components/CareerRoadmapTab').then(m => ({ default: m.CareerRoadmapTab })));
+const SkillGapTab = lazy(() => import('./components/SkillGapTab').then(m => ({ default: m.SkillGapTab })));
+const LearningResourcesTab = lazy(() => import('./components/LearningResourcesTab').then(m => ({ default: m.LearningResourcesTab })));
+const HistoryTab = lazy(() => import('./components/HistoryTab').then(m => ({ default: m.HistoryTab })));
+const InterviewPrepTab = lazy(() => import('./components/InterviewPrepTab').then(m => ({ default: m.InterviewPrepTab })));
+const ProfileTab = lazy(() => import('./components/ProfileTab').then(m => ({ default: m.ProfileTab })));
+const SettingsTab = lazy(() => import('./components/SettingsTab').then(m => ({ default: m.SettingsTab })));
+const UploadResumeTab = lazy(() => import('./components/UploadResumeTab').then(m => ({ default: m.UploadResumeTab })));
+const AdminUsersTab = lazy(() => import('./components/AdminUsersTab').then(m => ({ default: m.AdminUsersTab })));
+const MentorshipTab = lazy(() => import('./components/MentorshipTab'));
+const LegalAndInfoModal = lazy(() => import('./components/LegalAndInfoModal').then(m => ({ default: m.LegalAndInfoModal })));
+const SupportDeskModal = lazy(() => import('./components/SupportDeskModal').then(m => ({ default: m.SupportDeskModal })));
+
+const TabLoader = () => (
+  <div className="flex items-center justify-center min-h-[320px] w-full">
+    <Loader2 className="w-7 h-7 animate-spin text-primary/70" />
+  </div>
+);
 
 type AppState = 'landing' | 'auth' | 'onboarding' | 'dashboard' | 'public_view';
 
@@ -200,8 +208,21 @@ export default function App() {
 
   const checkUserResume = async (uid: string, passedUser?: any) => {
     try {
-      // Fetch career preferences from MongoDB
-      const prefData = await mongoApi.getPreferences(uid);
+      // Retrieve user profile XP points from the user state we already have if available
+      const activeUser = passedUser || user;
+      if (activeUser && activeUser.uid === uid) {
+        setUserProfile({
+          xpPoints: activeUser.xpPoints ?? 1250,
+          streak: activeUser.streak ?? 7
+        });
+      }
+
+      // Fetch preferences and resumes in parallel to cut startup latency
+      const [prefData, resumesList] = await Promise.all([
+        mongoApi.getPreferences(uid),
+        mongoApi.getResumes(uid)
+      ]);
+
       if (prefData && prefData.targetRole) {
         setTargetRole(prefData.targetRole);
       }
@@ -213,17 +234,6 @@ export default function App() {
         localStorage.setItem('careernav_ai_model', prefData.aiModel);
       }
 
-      // Retrieve user profile XP points from the user state we already have if available
-      const activeUser = passedUser || user;
-      if (activeUser && activeUser.uid === uid) {
-        setUserProfile({
-          xpPoints: activeUser.xpPoints ?? 1250,
-          streak: activeUser.streak ?? 7
-        });
-      }
-
-      // Retrieve resumes list from MongoDB instead of Firestore queries
-      const resumesList = await mongoApi.getResumes(uid);
       const validResumesList = (resumesList || [])
         .filter((item: any) => item && (item.id || item._id))
         .map((item: any) => {
@@ -252,21 +262,13 @@ export default function App() {
           setTargetRole(restoredRole);
         }
         
-        // Populate ATS Result
-        if (selectedResume.ats) {
-          setAtsData(selectedResume.ats);
-        } else if (selectedResume.id) {
-          const atsSnap = await mongoApi.getAtsResult(uid, selectedResume.id);
-          if (atsSnap) setAtsData(atsSnap);
-        }
-
-        // Populate roadmap
-        if (selectedResume.roadmap) {
-          setRoadmap(selectedResume.roadmap);
-        } else if (selectedResume.id) {
-          const roadmapSnap = await mongoApi.getRoadmap(uid, selectedResume.id);
-          if (roadmapSnap) setRoadmap(roadmapSnap);
-        }
+        // Populate ATS Result and Roadmap in parallel when not already embedded
+        const [atsSnap, roadmapSnap] = await Promise.all([
+          selectedResume.ats ? Promise.resolve(selectedResume.ats) : (selectedResume.id ? mongoApi.getAtsResult(uid, selectedResume.id) : Promise.resolve(null)),
+          selectedResume.roadmap ? Promise.resolve(selectedResume.roadmap) : (selectedResume.id ? mongoApi.getRoadmap(uid, selectedResume.id) : Promise.resolve(null))
+        ]);
+        if (atsSnap) setAtsData(atsSnap);
+        if (roadmapSnap) setRoadmap(roadmapSnap);
         setAppState('dashboard');
       } else if (pendingResumeData && pendingParsedData) {
         // Associate the guest/pending resume with the newly authenticated user ID
@@ -884,9 +886,14 @@ export default function App() {
       </AnimatePresence>
       
       {/* 1. Global Processing Overlay - Highest Priority */}
-      {isProcessing && appState !== 'auth' && <ProcessingView key="processing" />}
+      {isProcessing && appState !== 'auth' && (
+        <Suspense fallback={<TabLoader />}>
+          <ProcessingView key="processing" />
+        </Suspense>
+      )}
 
       {/* 2. Main App Content - Mutually exclusive with Processing Overlay */}
+      <Suspense fallback={<TabLoader />}>
       <AnimatePresence mode="wait">
         {!(isProcessing && appState !== 'auth') && appState === 'landing' && (
           <motion.div 
@@ -988,6 +995,7 @@ export default function App() {
             />
             <main className="flex-1 min-h-[calc(100vh-110px)] bg-neutral-50/50 dark:bg-zinc-950/40 pt-[114px] sm:pt-[122px] lg:pt-[128px] flex flex-col overflow-x-hidden">
               <div className="flex-1 p-3 sm:p-5 md:p-8 w-full max-w-7xl mx-auto overflow-x-hidden">
+                <Suspense fallback={<TabLoader />}>
                 <AnimatePresence mode="wait">
                   {activeTab === 'dashboard' && (
                     <motion.div key="main_dashboard" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
@@ -1140,6 +1148,7 @@ export default function App() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+                </Suspense>
               </div>
             </main>
 
@@ -1354,16 +1363,25 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+      </Suspense>
 
       {/* Global Legal & Information Modal */}
-      <LegalAndInfoModal type={infoModalType} onClose={() => setInfoModalType(null)} />
+      {infoModalType && (
+        <Suspense fallback={null}>
+          <LegalAndInfoModal type={infoModalType} onClose={() => setInfoModalType(null)} />
+        </Suspense>
+      )}
 
       {/* Help & Support Desk Modal */}
-      <SupportDeskModal 
-        isOpen={isSupportDeskOpen} 
-        onClose={() => setIsSupportDeskOpen(false)} 
-        currentUser={user} 
-      />
+      {isSupportDeskOpen && (
+        <Suspense fallback={null}>
+          <SupportDeskModal 
+            isOpen={isSupportDeskOpen} 
+            onClose={() => setIsSupportDeskOpen(false)} 
+            currentUser={user} 
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

@@ -20,7 +20,7 @@ export function ProcessingView({ status }: ProcessingViewProps) {
   useEffect(() => {
     const interval = setInterval(() => {
       setStep((s) => (s < steps.length - 1 ? s + 1 : s));
-    }, 2500);
+    }, 1100);
     return () => clearInterval(interval);
   }, [steps.length]);
 
@@ -67,7 +67,7 @@ export function ProcessingView({ status }: ProcessingViewProps) {
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: "100%" }}
-                    transition={{ duration: 2.5, ease: "linear" }}
+                    transition={{ duration: 1.1, ease: "linear" }}
                     className="h-0.5 bg-primary mt-1 rounded-full"
                   />
                 )}

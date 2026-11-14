@@ -145,47 +145,43 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
     { title: "Role Synthesis & Flight Deck", desc: "Verifying primary role & configuring target parameters" }
   ];
 
-  // Check current resume count on mount
-  useEffect(() => {
-    async function checkCount() {
-      if (!userId) {
-        setSavedCount(0);
-        setLoadingCount(false);
-        return;
-      }
-      try {
-        setLoadingCount(true);
-        const list = await mongoApi.getResumes(userId);
-        setSavedCount(Array.isArray(list) ? list.length : 0);
-      } catch (e) {
-        console.error("Failed to check resume quota:", e);
-      } finally {
-        setLoadingCount(false);
-      }
-    }
-    checkCount();
-  }, [userId]);
-
   const [usage, setUsage] = useState<{ availableCredits: number; limit: number; plan: string; resetDate?: string } | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(true);
 
+  // Parallel check of current resume count + weekly usage on mount
   useEffect(() => {
-    if (!userId) return;
-    async function checkUsage() {
+    if (!userId) {
+      setSavedCount(0);
+      setLoadingCount(false);
+      setLoadingUsage(false);
+      return;
+    }
+    let active = true;
+    async function checkQuotaAndUsage() {
       try {
+        setLoadingCount(true);
         setLoadingUsage(true);
-        const res = await fetch(`${BASE_URL}/api/users/${userId}/usage`);
-        if (res.ok) {
-          const data = await res.json();
-          setUsage(data);
+        const [listResult, usageRes] = await Promise.all([
+          mongoApi.getResumes(userId).catch(() => []),
+          fetch(`${BASE_URL}/api/users/${userId}/usage`).catch(() => null)
+        ]);
+        if (!active) return;
+        setSavedCount(Array.isArray(listResult) ? listResult.length : 0);
+        if (usageRes && usageRes.ok) {
+          const usageData = await usageRes.json();
+          if (active) setUsage(usageData);
         }
       } catch (e) {
-        console.error("Failed to check usage:", e);
+        console.error("Failed to check resume quota/usage:", e);
       } finally {
-        setLoadingUsage(false);
+        if (active) {
+          setLoadingCount(false);
+          setLoadingUsage(false);
+        }
       }
     }
-    checkUsage();
+    checkQuotaAndUsage();
+    return () => { active = false; };
   }, [userId]);
 
   const handleFile = async (file: File) => {
@@ -289,19 +285,15 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
       const skillsArr = Array.isArray(result.skills) ? result.skills : (result.data?.skills || []);
       setExtractedSkillsCount(skillsArr.length);
 
-      // Mark Step 1, 2, 3 as complete and move to Step 4
+      // Mark Step 1, 2, 3 complete & show Step 4 verification immediately
       setCompletedIndexSteps([0, 1, 2]);
       setCurrentIndexStep(3);
       setDetectedRoleName(detected);
-      setProgress(85);
+      setProgress(90);
 
-      // Guaranteed dwell on Step 4 so user clearly sees the 4th index finish and verify their role
-      await new Promise(r => setTimeout(r, 700));
+      await new Promise(r => setTimeout(r, 220));
       setCompletedIndexSteps([0, 1, 2, 3]);
       setProgress(100);
-
-      // Short pause to view all 4 completed indexes
-      await new Promise(r => setTimeout(r, 500));
       setStatus('success');
 
       setTimeout(() => {
@@ -323,9 +315,9 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
           base64,
           mimeType,
           filename: file.name,
-          analysisSpeed: result.analysisSpeed || '2.2s'
+          analysisSpeed: result.analysisSpeed || '1.8s'
         });
-      }, 350);
+      }, 150);
 
     } catch (err: any) {
       console.error(err);
