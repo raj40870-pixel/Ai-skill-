@@ -29,7 +29,8 @@ import {
   Trash2,
   Bug,
   WifiOff,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -70,6 +71,25 @@ export function AdminUsersTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [filterRole, setFilterRole] = useState<'all' | 'admin' | 'premium' | 'free'>('all');
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+
+  const handleDeleteUser = async (userObj: any) => {
+    const identifier = userObj.uid || userObj.email;
+    const label = userObj.email || userObj.displayName || identifier;
+    if (!window.confirm(`Are you sure you want to permanently delete the account "${label}"?\n\nThis will remove their profile, resumes, and ATS history from the database.`)) {
+      return;
+    }
+    setDeletingUserId(identifier);
+    try {
+      await mongoApi.deleteAdminUser(identifier);
+      setUsers(prev => prev.filter(u => u.uid !== userObj.uid && u.email?.toLowerCase() !== userObj.email?.toLowerCase()));
+      toast.success(`Account ${label} permanently removed.`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete user account.");
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
 
   // Support Tickets state
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
@@ -732,6 +752,22 @@ export function AdminUsersTab() {
                             <div className="text-xs font-black text-red-600 dark:text-red-400">{user.streak || 0}d</div>
                             <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Streak</div>
                           </div>
+                          {!isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteUser(user)}
+                              disabled={deletingUserId === (user.uid || user.email)}
+                              className="h-8 w-8 p-0 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                              title="Delete user account"
+                            >
+                              {deletingUserId === (user.uid || user.email) ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-destructive" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </Card>

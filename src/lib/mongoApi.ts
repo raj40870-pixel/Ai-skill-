@@ -537,6 +537,18 @@ class MongoApiService {
     return await response.json();
   }
 
+  async deleteAdminUser(identifier: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${BASE_URL}/api/admin/users/${encodeURIComponent(identifier)}`, {
+      method: 'DELETE',
+      headers: this.getHeaders()
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Failed to delete user');
+    }
+    return await response.json();
+  }
+
   // --- SUPPORT TICKETS API ---
   async createSupportTicket(ticket: {
     userId?: string;
