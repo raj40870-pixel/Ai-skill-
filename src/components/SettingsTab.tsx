@@ -36,7 +36,7 @@ export function SettingsTab({ userId, onNavigate }: SettingsTabProps) {
   const [clearing, setClearing] = useState(false);
   const [resumeCount, setResumeCount] = useState<number>(0);
   const [loadingUsage, setLoadingUsage] = useState(true);
-  const [usageStats, setUsageStats] = useState<{ analysisCount: number; availableCredits: number; resetDate: string; plan: string; limit: number } | null>(null);
+  const [usageStats, setUsageStats] = useState<{ analysisCount: number; availableCredits: number; resetDate: string; plan: string; limit: number; isAdmin?: boolean } | null>(null);
 
   const HISTORY_LIMIT = 3;
 
@@ -86,13 +86,14 @@ export function SettingsTab({ userId, onNavigate }: SettingsTabProps) {
     }
   };
 
+  const isFounderAccount = Boolean(usageStats?.isAdmin);
   const historyPercent = Math.min(100, Math.round((resumeCount / HISTORY_LIMIT) * 100));
-  const isHistoryLimitReached = usageStats?.plan !== 'PREMIUM' && usageStats?.plan !== 'ADMIN' && usageStats?.plan !== 'ENTERPRISE_ADMIN' && resumeCount >= HISTORY_LIMIT;
+  const isHistoryLimitReached = usageStats?.plan !== 'PREMIUM' && !isFounderAccount && resumeCount >= HISTORY_LIMIT;
   
   const analysisLimit = usageStats?.limit || 3;
   const analysisCount = usageStats?.analysisCount || 0;
   const availableCredits = usageStats?.availableCredits ?? (analysisLimit - analysisCount);
-  const isUnlimited = usageStats?.plan === 'PREMIUM' || usageStats?.plan === 'ADMIN' || usageStats?.plan === 'ENTERPRISE_ADMIN';
+  const isUnlimited = usageStats?.plan === 'PREMIUM' || isFounderAccount;
   const analysisPercent = isUnlimited ? 100 : Math.min(100, Math.round((availableCredits / analysisLimit) * 100));
   const isAnalysisLimitReached = !isUnlimited && availableCredits <= 0;
 
@@ -118,22 +119,22 @@ export function SettingsTab({ userId, onNavigate }: SettingsTabProps) {
             <div className="flex items-center gap-2">
               <span className={`w-2.5 h-2.5 rounded-full ${isUnlimited ? 'bg-primary' : 'bg-emerald-500'} animate-pulse`} />
               <h3 className="font-black text-sm text-foreground">
-                {(usageStats?.plan === 'ADMIN' || usageStats?.plan === 'ENTERPRISE_ADMIN') ? 'Founder / System Administrator' : usageStats?.plan === 'PREMIUM' ? 'Premium Tier Plan' : 'Standard Free Plan'}
+                {isFounderAccount ? 'Founder / System Administrator' : usageStats?.plan === 'PREMIUM' ? 'Premium Tier Plan' : 'Standard Free Plan'}
               </h3>
             </div>
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[11px] font-extrabold flex items-center gap-1">
                 <RotateCcw className="w-3 h-3" />
-                {(usageStats?.plan === 'ADMIN' || usageStats?.plan === 'ENTERPRISE_ADMIN') ? 'Unlimited Bypass' : '7-Day Cycle'}
+                {isFounderAccount ? 'Unlimited Bypass' : '7-Day Cycle'}
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[11px] font-extrabold">
-                {(usageStats?.plan === 'ADMIN' || usageStats?.plan === 'ENTERPRISE_ADMIN') ? 'Founder Admin' : usageStats?.plan === 'PREMIUM' ? '$ Premium' : '$0 / Free'}
+                {isFounderAccount ? 'Founder Admin' : usageStats?.plan === 'PREMIUM' ? '$ Premium' : '$0 / Free'}
               </span>
             </div>
           </div>
 
           <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
-            {(usageStats?.plan === 'ADMIN' || usageStats?.plan === 'ENTERPRISE_ADMIN') 
+            {isFounderAccount 
               ? 'Complete system administrative access. Analysis bypass enabled. All history limits removed.'
               : usageStats?.plan === 'PREMIUM' 
               ? 'Unlimited resume analyses, deep reasoning Pro models, and priority career intelligence access.'

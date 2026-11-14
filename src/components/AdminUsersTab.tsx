@@ -37,10 +37,8 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 
-const ADMIN_EMAILS = [
-  "kamaljit444501@gmail.com",
-  "raj40870@gmail.com"
-];
+const FOUNDER_EMAIL = "kamaljit444501@gmail.com";
+const ADMIN_EMAILS = [FOUNDER_EMAIL, "raj40870@gmail.com"];
 
 function cn(...classes: any[]) {
   return classes.filter(Boolean).join(' ');
@@ -220,7 +218,7 @@ export function AdminUsersTab() {
 
   const isUserAdmin = (u: any) => {
     const emailLower = (u.email || '').toLowerCase().trim();
-    return ADMIN_EMAILS.includes(emailLower) || u.plan === 'ENTERPRISE_ADMIN' || u.plan === 'ADMIN' || u.isAdmin === true || u.role === 'admin';
+    return emailLower === FOUNDER_EMAIL;
   };
 
   // Filtered Users
@@ -232,7 +230,7 @@ export function AdminUsersTab() {
     if (!matchesSearch) return false;
 
     if (filterRole === 'admin') return isUserAdmin(user);
-    if (filterRole === 'premium') return user.plan === 'PREMIUM' || user.plan === 'ENTERPRISE_ADMIN';
+    if (filterRole === 'premium') return user.plan === 'PREMIUM';
     if (filterRole === 'free') return !isUserAdmin(user) && user.plan !== 'PREMIUM';
     return true;
   });

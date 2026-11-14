@@ -70,11 +70,7 @@ const MentorshipTab: React.FC<MentorshipTabProps> = ({ user }) => {
   const [selectedModel, setSelectedModel] = useState('gemini-3.7-flash');
   const [tokenInfo, setTokenInfo] = useState<{ used: number; limit: number; isAdmin: boolean } | null>(() => {
     if (user) {
-      const adminEmails = [
-        "kamaljit444501@gmail.com",
-        "kamaljit44501@gmail.com"
-      ];
-      const isAdmin = !!(user.email && adminEmails.includes(user.email.toLowerCase())) || user.plan === 'ENTERPRISE_ADMIN' || user.plan === 'ADMIN' || user.isAdmin === true;
+      const isAdmin = (user.email || '').toLowerCase().trim() === "kamaljit444501@gmail.com";
       return {
         used: user.usage?.tokensUsed || 0,
         limit: user.usage?.tokenLimit || (user.plan === 'PREMIUM' || isAdmin ? 1000000 : 50000),

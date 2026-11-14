@@ -11,7 +11,12 @@ import {
   Check,
   Target,
   Copy,
-  Wand2
+  Wand2,
+  RefreshCw,
+  FileSearch,
+  AlertTriangle,
+  Layers,
+  Tag
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +31,7 @@ import {
 } from 'recharts';
 import { toast } from 'sonner';
 import { generateFullAuditPdf } from '../lib/pdfGenerator';
+import { geminiService } from '../services/geminiService';
 
 interface ATSScoreTabProps {
   resumeData: any;
@@ -33,12 +39,17 @@ interface ATSScoreTabProps {
   roadmap?: any;
   user?: any;
   onNavigate?: (tab: string) => void;
+  onUpdateAts?: (newAts: any, newRole?: string) => void;
 }
 
-export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate }: ATSScoreTabProps) {
+export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, onUpdateAts }: ATSScoreTabProps) {
   const [resolvedFixes, setResolvedFixes] = useState<Record<number, boolean>>({});
   const [copiedRewriteIdx, setCopiedRewriteIdx] = useState<number | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [showJdMatcher, setShowJdMatcher] = useState(false);
+  const [customAuditRole, setCustomAuditRole] = useState<string>('');
+  const [jobDescription, setJobDescription] = useState<string>('');
+  const [isReauditing, setIsReauditing] = useState(false);
 
   if (!resumeData || !resumeData.text) {
     return (
@@ -139,6 +150,71 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate }: 
 
   const activeFixesCount = displayFixes.length - Object.values(resolvedFixes).filter(Boolean).length;
 
+  const matchedKeywords: string[] = Array.isArray(atsData.matched_keywords) ? atsData.matched_keywords : [];
+  const missingKeywords: Array<{ keyword: string; importance?: string; suggestion?: string }> =
+    Array.isArray(atsData.missing_keywords) ? atsData.missing_keywords : [];
+  const sectionAudit: Array<{ section: string; status: string; scorePercent: number; feedback: string }> =
+    Array.isArray(atsData.section_audit) ? atsData.section_audit : [];
+
+  // Deterministic client fallback if viewing a legacy ATS record created prior to telemetry upgrade
+  const telemetry = atsData.telemetry || (() => {
+    const clean = String(resumeData?.text || '').trim();
+    const words = clean.split(/\s+/).filter(Boolean);
+    const lines = clean.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const bulletLines = lines.filter(l => /^([•\-–—*]|\d+\.)\s+/.test(l) || (l.length >= 35 && l.length <= 260 && /^[A-Z]/.test(l) && /\s/.test(l)));
+    const quantifiedBullets = bulletLines.filter(l => /\d+%|\$\d+|\b\d+(\.\d+)?\b/.test(l)).length;
+    const lower = clean.toLowerCase();
+    return {
+      wordCount: words.length,
+      estimatedPages: Math.max(1, Math.round((words.length / 450) * 10) / 10),
+      bulletCount: bulletLines.length,
+      quantifiedBullets,
+      quantifiedPercent: bulletLines.length > 0 ? Math.round((quantifiedBullets / bulletLines.length) * 100) : 0,
+      weakPhrasesFound: ["responsible for", "worked on", "helped with", "assisted"].filter(p => lower.includes(p)),
+      clichesFound: ["hardworking", "team player", "detail-oriented", "self-starter"].filter(c => lower.includes(c)),
+      contact: {
+        email: /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(clean),
+        phone: /(\+?\d[\d\s\-()]{8,}\d)/.test(clean),
+        linkedin: /linkedin\.com/i.test(clean),
+        github: /github\.com/i.test(clean),
+      }
+    };
+  })();
+
+  const handleRunLiveReaudit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const nextRole = (customAuditRole || evaluatedRole).trim();
+    if (!nextRole) {
+      toast.error("Please enter a Target Role to audit against.");
+      return;
+    }
+    setIsReauditing(true);
+    const toastId = toast.loading(
+      jobDescription.trim().length > 20
+        ? `Matching resume against JD for "${nextRole}"...`
+        : `Re-scoring resume strictly for "${nextRole}"...`
+    );
+    try {
+      const rId = resumeData?.id || resumeData?._id;
+      const freshAts = await geminiService.getATSScore(
+        resumeData.text,
+        nextRole,
+        user?.uid,
+        jobDescription.trim(),
+        rId
+      );
+      setResolvedFixes({});
+      if (onUpdateAts) {
+        onUpdateAts(freshAts, nextRole);
+      }
+      toast.success(`Live ATS Re-Audit Complete: ${freshAts.score}/100 for ${nextRole}`, { id: toastId });
+    } catch (err: any) {
+      toast.error(err?.message || "Live ATS re-audit failed. Please try again.", { id: toastId });
+    } finally {
+      setIsReauditing(false);
+    }
+  };
+
   const handleDownloadPdf = () => {
     try {
       setIsExportingPdf(true);
@@ -200,6 +276,19 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate }: 
         {/* Action Controls */}
         <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto">
           <Button
+            type="button"
+            variant={showJdMatcher ? "default" : "outline"}
+            onClick={() => {
+              if (!customAuditRole) setCustomAuditRole(evaluatedRole);
+              setShowJdMatcher(prev => !prev);
+            }}
+            className="rounded-xl text-xs font-bold h-10 px-3.5 gap-1.5 cursor-pointer"
+          >
+            <FileSearch className="w-3.5 h-3.5" />
+            <span>{showJdMatcher ? "Hide Role / JD Matcher" : "Match JD / Switch Role"}</span>
+          </Button>
+
+          <Button
             onClick={handleDownloadPdf}
             disabled={isExportingPdf}
             className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-10 px-4 shadow-md shadow-blue-500/20 cursor-pointer flex items-center gap-2 transition-all hover:scale-[1.02]"
@@ -221,6 +310,152 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate }: 
           )}
         </div>
       </header>
+
+      {/* Live Target Role & Job Description (JD) Re-Audit Drawer */}
+      {showJdMatcher && (
+        <Card className="glass border border-blue-500/30 bg-blue-500/[0.03] p-4 sm:p-6 rounded-3xl">
+          <form onSubmit={handleRunLiveReaudit} className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-black tracking-tight flex items-center gap-2 text-foreground">
+                  <Target className="w-4 h-4 text-blue-600" />
+                  Live Target Role & Job Description (JD) ATS Matcher
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Test your current resume against a different target role or paste a real Job Description for exact keyword & score calibration—no re-upload needed.
+                </p>
+              </div>
+              {atsData.jd_match_mode && (
+                <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-600 font-mono self-start">
+                  JD-Calibrated Score
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="md:col-span-1 space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground font-mono">
+                  Target Role
+                </label>
+                <input
+                  type="text"
+                  value={customAuditRole}
+                  onChange={(e) => setCustomAuditRole(e.target.value)}
+                  placeholder={evaluatedRole}
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                />
+              </div>
+              <div className="md:col-span-2 space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground font-mono">
+                  Optional Job Description (Paste JD text for Jobscan-style matching)
+                </label>
+                <textarea
+                  rows={2}
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  placeholder="Paste required skills, responsibilities, and qualifications from the job posting..."
+                  className="w-full p-2.5 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-y"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="submit"
+                disabled={isReauditing}
+                className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-10 px-5 gap-2 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isReauditing ? 'animate-spin' : ''}`} />
+                <span>{isReauditing ? 'Running Live ATS Audit...' : 'Run Live Re-Audit'}</span>
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {/* Resume Telemetry & Parser Hygiene Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="p-3.5 rounded-2xl border border-border/60 bg-card/70 space-y-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground font-mono block">
+            Document Length
+          </span>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-lg sm:text-xl font-black text-foreground">{telemetry.wordCount} words</span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+              telemetry.wordCount >= 300 && telemetry.wordCount <= 900 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'
+            }`}>
+              ~{telemetry.estimatedPages} pg
+            </span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Ideal ATS range: 350–850 words</p>
+        </div>
+
+        <div className="p-3.5 rounded-2xl border border-border/60 bg-card/70 space-y-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground font-mono block">
+            Quantified Impact
+          </span>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-lg sm:text-xl font-black text-foreground">
+              {telemetry.quantifiedBullets}/{Math.max(1, telemetry.bulletCount)} bullets
+            </span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+              telemetry.quantifiedPercent >= 50 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+            }`}>
+              {telemetry.quantifiedPercent}% KPI
+            </span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Bullets backed by numbers / % / scale</p>
+        </div>
+
+        <div className="p-3.5 rounded-2xl border border-border/60 bg-card/70 space-y-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground font-mono block">
+            Contact & Links
+          </span>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {[
+              { label: 'Email', ok: telemetry.contact?.email },
+              { label: 'Phone', ok: telemetry.contact?.phone },
+              { label: 'LinkedIn', ok: telemetry.contact?.linkedin },
+              { label: 'GitHub', ok: telemetry.contact?.github }
+            ].map((item) => (
+              <span
+                key={item.label}
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                  item.ok
+                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                    : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                }`}
+              >
+                {item.ok ? '✓' : '✗'} {item.label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-2xl border border-border/60 bg-card/70 space-y-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground font-mono block">
+            Passive / Cliché Check
+          </span>
+          {(telemetry.weakPhrasesFound?.length || 0) + (telemetry.clichesFound?.length || 0) === 0 ? (
+            <div className="pt-1">
+              <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> No weak clichés detected
+              </span>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Strong active voice hygiene</p>
+            </div>
+          ) : (
+            <div className="pt-1 space-y-1">
+              <span className="text-xs font-bold text-amber-600 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                {(telemetry.weakPhrasesFound?.length || 0) + (telemetry.clichesFound?.length || 0)} weak phrase(s)
+              </span>
+              <p className="text-[10px] text-muted-foreground truncate" title={[...(telemetry.weakPhrasesFound || []), ...(telemetry.clichesFound || [])].join(', ')}>
+                Flagged: {[...(telemetry.weakPhrasesFound || []), ...(telemetry.clichesFound || [])].slice(0, 3).join(', ')}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Primary Score Ring and Breakdown Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -366,6 +601,126 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate }: 
             </div>
           ))}
         </div>
+      )}
+
+      {/* SECTION: ATS KEYWORD SCANNER MATRIX (MATCHED VS MISSING) */}
+      {(matchedKeywords.length > 0 || missingKeywords.length > 0) && (
+        <Card className="glass border border-border/60 p-4 sm:p-6 rounded-3xl">
+          <CardHeader className="p-0 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/40 pb-3">
+              <div>
+                <CardTitle className="text-sm sm:text-base font-black tracking-tight text-foreground flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-primary" />
+                  ATS Keyword Scanner Matrix ({evaluatedRole})
+                </CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  High-signal hard skills and role keywords detected vs missing for Workday, Greenhouse & Taleo ranking filters.
+                </CardDescription>
+              </div>
+              <span className="text-[10px] font-black px-3 py-1 rounded-md bg-blue-500/10 text-blue-600 font-mono self-start sm:self-auto">
+                {matchedKeywords.length} MATCHED • {missingKeywords.length} MISSING
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 pt-3 grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="space-y-2.5">
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600 font-mono flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Verified Matched Keywords
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {matchedKeywords.map((kw, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold"
+                  >
+                    ✓ {kw}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              <span className="text-[11px] font-black uppercase tracking-wider text-rose-600 font-mono flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5" /> High-Impact Missing Keywords
+              </span>
+              <div className="space-y-2">
+                {missingKeywords.map((mk, idx) => (
+                  <div key={idx} className="p-2.5 rounded-xl bg-rose-500/5 border border-rose-500/20 flex items-start justify-between gap-2">
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-black text-foreground">{mk.keyword}</span>
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded font-mono ${
+                          mk.importance === 'Critical' ? 'bg-rose-500/15 text-rose-600' : 'bg-amber-500/15 text-amber-600'
+                        }`}>
+                          {mk.importance || 'High'}
+                        </span>
+                      </div>
+                      {mk.suggestion && (
+                        <p className="text-[11px] text-muted-foreground leading-snug">{mk.suggestion}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(mk.keyword);
+                        toast.success(`Copied keyword "${mk.keyword}"`);
+                      }}
+                      className="p-1.5 rounded-lg border border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
+                      title={`Copy "${mk.keyword}"`}
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* SECTION: SECTION-BY-SECTION RESUME DIAGNOSTIC */}
+      {sectionAudit.length > 0 && (
+        <Card className="glass border border-border/60 p-4 sm:p-6 rounded-3xl">
+          <CardHeader className="p-0 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/40 pb-3">
+              <div>
+                <CardTitle className="text-sm sm:text-base font-black tracking-tight text-foreground flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-primary" />
+                  Section-by-Section Diagnostic Audit
+                </CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Granular strength grading across every core section of your resume.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 pt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {sectionAudit.map((sec, idx) => {
+              const statusStyle =
+                sec.status === 'Strong'
+                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                  : sec.status === 'Missing'
+                    ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                    : 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+              const barColor =
+                sec.scorePercent >= 75 ? 'bg-emerald-500' : sec.scorePercent >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+              return (
+                <div key={idx} className="p-3.5 rounded-2xl border border-border/60 bg-card/70 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-foreground">{sec.section}</span>
+                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${statusStyle}`}>
+                      {sec.status} • {sec.scorePercent}%
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div className={`h-full rounded-full ${barColor}`} style={{ width: `${sec.scorePercent}%` }} />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-snug">{sec.feedback}</p>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
       )}
 
       {/* SECTION: BEFORE VS AFTER XYZ BULLET REWRITE LAB */}

@@ -33,6 +33,22 @@ export interface ATSResult {
   breakdown: { criterion: string; score: number; max: number; fix: string }[];
   priority_fixes: PriorityFix[];
   bullet_rewrites?: BulletRewrite[];
+  matched_keywords?: string[];
+  missing_keywords?: Array<{ keyword: string; importance?: 'Critical' | 'High' | 'Medium'; suggestion?: string }>;
+  section_audit?: Array<{ section: string; status: 'Strong' | 'Needs Work' | 'Missing'; scorePercent: number; feedback: string }>;
+  telemetry?: {
+    wordCount: number;
+    estimatedPages: number;
+    bulletCount: number;
+    quantifiedBullets: number;
+    quantifiedPercent: number;
+    strongVerbBullets: number;
+    weakPhrasesFound: string[];
+    clichesFound: string[];
+    contact: { email: boolean; phone: boolean; linkedin: boolean; github: boolean; portfolio: boolean };
+    sectionsFound: Record<string, boolean>;
+  };
+  jd_match_mode?: boolean;
 }
 
 export interface RoadmapData {
@@ -147,12 +163,12 @@ export const geminiService = {
     return res.json();
   },
 
-  async getATSScore(resumeText: string, jobTitle: string = "General", uid?: string): Promise<ATSResult> {
+  async getATSScore(resumeText: string, jobTitle: string = "General", uid?: string, jobDescription?: string, resumeId?: string): Promise<ATSResult> {
     const model = getActiveAIModel();
     const res = await fetch(`${BASE_URL}/api/resume/ats`, {
       method: 'POST',
       headers: mongoApi.getHeaders(),
-      body: JSON.stringify({ text: resumeText, jobTitle, model, uid })
+      body: JSON.stringify({ text: resumeText, jobTitle, jobDescription, model, uid, resumeId })
     });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
@@ -262,7 +278,7 @@ export const geminiService = {
     return data;
   },
 
-  async analyzeCareer(resumeText: string, filename: string, targetRole: string, region: string, modelOverride?: string): Promise<any> {
+  async analyzeCareer(resumeText: string, filename: string, targetRole: string, region: string, modelOverride?: string, parsedData?: any): Promise<any> {
     const model = modelOverride || getActiveAIModel();
     const token = mongoApi.getToken();
     const headers: Record<string, string> = {
@@ -280,6 +296,7 @@ export const geminiService = {
         targetRole,
         region,
         model,
+        parsedData,
         forceFresh: true
       })
     });

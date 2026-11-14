@@ -417,13 +417,14 @@ export default function App() {
     setIsProcessing(true);
     const id = toast.loading(`Mapping your career profile & scanning global listings for ${selectedRole}...`);
     try {
-      // Perform the comprehensive Stage 1-5 analysis in a single backend orchestration
+      // Perform the comprehensive Stage 1-5 analysis in a single backend orchestration (reusing parsedData from Step 1)
       const result = await geminiService.analyzeCareer(
         rData.text,
         rData.filename,
         selectedRole,
         selectedRegion,
-        selectedModel
+        selectedModel,
+        pData
       );
 
       const { resume, ats, roadmap, market, analysis_id } = result;
@@ -1029,6 +1030,13 @@ export default function App() {
                         roadmap={temporaryRoadmap || roadmap}
                         user={user}
                         onNavigate={(tab) => setActiveTab(tab)} 
+                        onUpdateAts={(newAts, newRole) => {
+                          setAtsData(newAts);
+                          if (newRole) {
+                            setTargetRole(newRole);
+                            setResumeData((prev: any) => prev ? { ...prev, targetRole: newRole, ats: newAts } : prev);
+                          }
+                        }}
                       />
                     </motion.div>
                   )}
@@ -1075,15 +1083,7 @@ export default function App() {
                         onSuccess={handleUploadSuccess} 
                         onNavigate={(tab) => setActiveTab(tab)}
                         isAdmin={Boolean(
-                          user && (
-                            (user.email && [
-                              "kamaljit444501@gmail.com",
-                              "raj40870@gmail.com"
-                            ].includes(user.email.toLowerCase())) ||
-                            user.plan === 'ENTERPRISE_ADMIN' ||
-                            user.plan === 'ADMIN' ||
-                            user.isAdmin === true
-                          )
+                          user?.email && user.email.toLowerCase().trim() === "kamaljit444501@gmail.com"
                         )}
                       />
                     </motion.div>
@@ -1097,10 +1097,9 @@ export default function App() {
                         onDeleteResume={handleDeleteResume}
                         onClearAllHistory={handleClearAllHistory}
                         onNavigate={(tab) => setActiveTab(tab)}
-                        isAdmin={!!(user?.email && [
-                          "kamaljit444501@gmail.com",
-                          "raj40870@gmail.com"
-                        ].includes(user.email.toLowerCase())) || user?.plan === 'ADMIN' || user?.isAdmin === true}
+                        isAdmin={Boolean(
+                          user?.email && user.email.toLowerCase().trim() === "kamaljit444501@gmail.com"
+                        )}
                       />
                     </motion.div>
                   )}

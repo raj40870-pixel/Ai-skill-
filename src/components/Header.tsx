@@ -33,25 +33,13 @@ interface HeaderProps {
   user: any;
 }
 
-const ADMIN_EMAILS = [
-  "kamaljit444501@gmail.com",
-  "kamaljit44501@gmail.com",
-  "raj40870@gmail.com"
-];
+const FOUNDER_EMAIL = "kamaljit444501@gmail.com";
 
 export function Header({ activeTab, onTabChange, onLogout, user }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const userEmail = (user?.email || '').toLowerCase().trim();
-  const isAdmin = Boolean(
-    user && (
-      ADMIN_EMAILS.includes(userEmail) ||
-      user.plan === 'ENTERPRISE_ADMIN' ||
-      user.plan === 'ADMIN' ||
-      user.isAdmin === true ||
-      user.role === 'admin'
-    )
-  );
+  const isAdmin = Boolean(user && userEmail === FOUNDER_EMAIL);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
