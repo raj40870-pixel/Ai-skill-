@@ -335,11 +335,13 @@ export function HistoryTab({
                                   targetRole: item.targetRole || item.parsedData?.experience?.[0]?.role || 'Software Engineering Professional',
                                   resumeFilename: item.filename || 'resume.pdf',
                                   atsData: item.ats ? {
+                                    evaluatedRole: item.ats.evaluatedRole || item.targetRole,
                                     score: item.ats.score,
                                     market_match: item.ats.market_match || 85,
                                     label: item.ats.label,
                                     breakdown: item.ats.breakdown,
-                                    priority_fixes: item.ats.priority_fixes
+                                    priority_fixes: item.ats.priority_fixes,
+                                    bullet_rewrites: item.ats.bullet_rewrites
                                   } : undefined,
                                   roadmap: item.roadmap || undefined
                                 });

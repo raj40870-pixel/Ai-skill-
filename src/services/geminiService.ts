@@ -17,12 +17,22 @@ export interface PriorityFix {
   severity: 'Critical' | 'High' | 'Medium' | 'Low';
 }
 
+export interface BulletRewrite {
+  section?: string;
+  before: string;
+  after: string;
+  reason: string;
+}
+
 export interface ATSResult {
+  evaluatedRole?: string;
   score: number;
+  market_match?: number;
   label: string;
   color: string;
   breakdown: { criterion: string; score: number; max: number; fix: string }[];
   priority_fixes: PriorityFix[];
+  bullet_rewrites?: BulletRewrite[];
 }
 
 export interface RoadmapData {

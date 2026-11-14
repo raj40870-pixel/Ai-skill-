@@ -7,6 +7,7 @@ export interface PdfReportData {
   resumeFilename?: string;
   parsedResume?: any;
   atsData?: {
+    evaluatedRole?: string;
     score?: number;
     market_match?: number;
     label?: string;
@@ -21,6 +22,12 @@ export interface PdfReportData {
       impact: string;
       fix: string;
       severity: string;
+    }>;
+    bullet_rewrites?: Array<{
+      section?: string;
+      before: string;
+      after: string;
+      reason: string;
     }>;
   };
   roadmap?: {
@@ -240,7 +247,7 @@ export function generateFullAuditPdf(data: PdfReportData) {
   // --- SECTION 1: ATS SCORE & RATING ---
   writer.drawSectionHeading("1. ATS Optimization Scorecard & Evaluation", "Parser calibration benchmarked against Workday, Taleo, Greenhouse & Jobscan algorithms");
 
-  const score = data.atsData?.score ?? 78;
+  const score = typeof data.atsData?.score === 'number' ? data.atsData.score : 0;
   const label = data.atsData?.label || (score >= 80 ? "Competitive Match" : score >= 60 ? "Moderate Fit" : "Needs Optimization");
 
   // Score Highlight Card
@@ -301,16 +308,7 @@ export function generateFullAuditPdf(data: PdfReportData) {
   writer.y += 26;
 
   // --- TECHNICAL CRITERIA BREAKDOWN TABLE (WITH FULL MULTILINE WRAPPING) ---
-  const breakdown = data.atsData?.breakdown || [
-    { criterion: "Core Technical Skills Match", score: 18, max: 25, fix: "Align keywords with target role job postings." },
-    { criterion: "Measurable Impact & Metrics", score: 11, max: 20, fix: "Add numbers (%, $, user scale) to project bullet points." },
-    { criterion: "Experience Alignment & Depth", score: 11, max: 15, fix: "Demonstrate progressive responsibility and ownership." },
-    { criterion: "Action Verbs & STAR Phrasing", score: 7, max: 10, fix: "Use strong action verbs like Architected, Engineered." },
-    { criterion: "Project Quality & Code Proof", score: 7, max: 10, fix: "Add live URLs and GitHub repository links." },
-    { criterion: "ATS Structural Formatting", score: 8, max: 10, fix: "Standardize section headings: Experience, Skills, Education." },
-    { criterion: "Education & Certifications", score: 4, max: 5, fix: "Standard degree title and completion date formatting." },
-    { criterion: "Online Footprint & Contact", score: 4, max: 5, fix: "Ensure clean LinkedIn, GitHub, and portfolio links." }
-  ];
+  const breakdown = Array.isArray(data.atsData?.breakdown) ? data.atsData.breakdown : [];
 
   writer.ensureSpace(12);
 
@@ -379,35 +377,16 @@ export function generateFullAuditPdf(data: PdfReportData) {
   // --- SECTION 2: PRIORITY RESUME FIXES ---
   writer.drawSectionHeading("2. Priority Actionable Fixes (High-Impact Adjustments)", "Resolve critical parsing bottlenecks that cause automatic candidate drop-off");
 
-  const rawFixes = data.atsData?.priority_fixes || [];
-  const defaultFixes = [
-    {
-      problem: "Missing Quantifiable Achievement Metrics",
-      impact: "Enterprise ATS filters automatically rank resumes without numerical KPIs lower (~14 point penalty).",
-      fix: "Rewrite bullet points using the XYZ Formula: Accomplished [X], measured by [Y], by doing [Z]. Add metrics like % speedup, revenue, latency, or user scale.",
-      severity: "Critical"
-    },
-    {
-      problem: "Target Role Tech Keyword Gaps",
-      impact: "Missing vital technologies drops keyword density below competitive recruiter thresholds (~10 point penalty).",
-      fix: "Explicitly mention core modern frameworks, databases, and cloud tools relevant to your target role across experience bullets.",
-      severity: "High"
-    },
-    {
-      problem: "Passive Action Verbs in Bullet Points",
-      impact: "Phrases like 'Responsible for' reduce candidate authority in automated natural language parsing (~5 point penalty).",
-      fix: "Start every bullet with high-impact action verbs: 'Architected', 'Spearheaded', 'Engineered', 'Optimized', or 'Orchestrated'.",
-      severity: "Medium"
-    },
-    {
-      problem: "Non-Standard Section Headings",
-      impact: "Uncommon header names cause parsers to misclassify or completely skip your work experience.",
-      fix: "Stick to industry-standard headers: 'Work Experience', 'Technical Skills', 'Education', and 'Projects'.",
-      severity: "Low"
-    }
-  ];
+  const fixesList = data.atsData?.priority_fixes || [];
 
-  const fixesList = rawFixes.length > 0 ? rawFixes : defaultFixes;
+  if (fixesList.length === 0) {
+    writer.ensureSpace(14);
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text("No priority fixes recorded for this audit.", writer.margin + 3, writer.y + 4);
+    writer.y += 10;
+  }
 
   fixesList.forEach((item) => {
     const wrappedProblem = doc.splitTextToSize(`Problem: ${item.problem}`, writer.contentWidth - 36);
@@ -464,28 +443,25 @@ export function generateFullAuditPdf(data: PdfReportData) {
   writer.y += 4;
 
   // --- SECTION 3: RESUME BULLET REWRITE LAB (BEFORE VS. AFTER TRANSFORMATIONS) ---
-  writer.drawSectionHeading("3. Resume Bullet Rewrite Lab (Before vs. After Transformations)", "Convert generic duties into high-scoring, metric-driven ATS power statements");
+  writer.drawSectionHeading("3. Resume Bullet Rewrite Lab (Before vs. After XYZ Transformations)", "Weak bullets from your resume rewritten using Google's XYZ formula");
 
-  const bulletTransformations = [
-    {
-      domain: "AI & Full-Stack Engineering Feature",
-      before: "Worked on AI agent workflows and integrated API endpoints for user automation.",
-      after: "Architected autonomous agentic workflows using LangGraph and Python FastAPI, reducing manual execution latency by 42% across 1,200+ monthly enterprise tasks.",
-      benefit: "Adds quantifiable metric + modern tool stack; +14 pts on Workday semantic parser."
-    },
-    {
-      domain: "Backend Scalability & Database Performance",
-      before: "Responsible for writing database queries and improving server response times.",
-      after: "Engineered PostgreSQL compound indexing and integrated Redis distributed caching, scaling throughput to 1,500 req/sec while slashing p99 latency from 450ms to 62ms.",
-      benefit: "Demonstrates production architectural rigor and sub-100ms performance KPIs; +12 pts."
-    },
-    {
-      domain: "Cloud Infrastructure & CI/CD Automation",
-      before: "Deployed the application to cloud using Docker containers.",
-      after: "Automated end-to-end CI/CD release pipeline using GitHub Actions and multi-stage Docker builds, reducing deployment failure rates to 0% and shrinking image size by 54%.",
-      benefit: "Signals enterprise DevOps ownership and zero-downtime deployment readiness; +10 pts."
-    }
-  ];
+  const bulletTransformations = (data.atsData?.bullet_rewrites && data.atsData.bullet_rewrites.length > 0)
+    ? data.atsData.bullet_rewrites.map((r, idx) => ({
+        domain: r.section || `Resume Bullet #${idx + 1}`,
+        before: r.before,
+        after: r.after,
+        benefit: r.reason || "Applies quantified XYZ impact metrics for stronger ATS ranking."
+      }))
+    : [];
+
+  if (bulletTransformations.length === 0) {
+    writer.ensureSpace(14);
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Re-run a fresh ATS audit to generate personalized Before vs. After XYZ bullet rewrites.", writer.margin + 3, writer.y + 4);
+    writer.y += 10;
+  }
 
   bulletTransformations.forEach((lab, idx) => {
     const wrappedBefore = doc.splitTextToSize(`* ORIGINAL (WEAK): "${lab.before}"`, writer.contentWidth - 14);

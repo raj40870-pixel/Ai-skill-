@@ -48,8 +48,9 @@ export function Dashboard({
   onUploadComplete
 }: DashboardProps) {
   const isAnalyzed = !!resume;
-  const score = atsData?.score || 85;
-  const match = atsData?.market_match || (isAnalyzed ? 92 : 88);
+  const hasAts = typeof atsData?.score === 'number';
+  const score = hasAts ? atsData.score : null;
+  const match = typeof atsData?.market_match === 'number' && atsData.market_match > 0 ? atsData.market_match : null;
   
   return (
     <div className="space-y-10 pb-20 max-w-7xl mx-auto">
@@ -79,14 +80,14 @@ export function Dashboard({
           <div className="flex items-center gap-4">
             <div className="text-right">
               <span className="text-[10px] font-black uppercase text-muted-foreground block tracking-widest">ATS Score</span>
-              <div className="text-4xl font-black text-primary">{isAnalyzed ? score : 85}%</div>
-              <span className="text-[9px] font-bold text-emerald-600 block">{isAnalyzed ? 'Live Data' : 'Demo Score'}</span>
+              <div className="text-4xl font-black text-primary">{isAnalyzed ? (score !== null ? `${score}%` : '--') : '85%'}</div>
+              <span className="text-[9px] font-bold text-emerald-600 block">{isAnalyzed ? (score !== null ? 'Live Data' : 'Audit Needed') : 'Demo Score'}</span>
             </div>
             <div className="w-px h-10 bg-border" />
             <div className="text-right">
               <span className="text-[10px] font-black uppercase text-muted-foreground block tracking-widest">Market Match</span>
-              <div className="text-4xl font-black text-blue-500">{isAnalyzed ? match : 88}%</div>
-              <span className="text-[9px] font-bold text-blue-400 block">{isAnalyzed ? 'Industry Peak' : 'Projected'}</span>
+              <div className="text-4xl font-black text-blue-500">{isAnalyzed ? (match !== null ? `${match}%` : '--') : '88%'}</div>
+              <span className="text-[9px] font-bold text-blue-400 block">{isAnalyzed ? (match !== null ? 'Industry Peak' : 'Pending') : 'Projected'}</span>
             </div>
           </div>
         </div>

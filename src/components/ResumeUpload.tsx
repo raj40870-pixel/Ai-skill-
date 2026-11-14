@@ -136,7 +136,7 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
   const [currentIndexStep, setCurrentIndexStep] = useState<number>(0);
   const [completedIndexSteps, setCompletedIndexSteps] = useState<number[]>([]);
   const [detectedRoleName, setDetectedRoleName] = useState<string>('');
-  const [indexedSkillsCount, setIndexedSkillsCount] = useState<number>(0);
+  const [extractedSkillsCount, setExtractedSkillsCount] = useState<number>(0);
 
   const indexSteps = [
     { title: "Document Structure & OCR Layer", desc: "Extracting text layout, syntax & raw resume streams" },
@@ -236,7 +236,7 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
       setCurrentIndexStep(0);
       setCompletedIndexSteps([]);
       setDetectedRoleName('');
-      setIndexedSkillsCount(0);
+      setExtractedSkillsCount(0);
 
       // Prepare payload with automatic image optimization for high-res photos
       const { base64, mimeType } = await prepareFilePayload(file);
@@ -281,14 +281,18 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
       }
 
       const result = await res.json();
-      const detected = (result.detectedRole || "").trim();
-      const skillsCount = Array.isArray(result.skills) ? result.skills.length : (result.data?.skills?.length || 0);
+      const detected = (result.detectedRole || '').trim();
+      if (!detected) {
+        throw new Error("AI could not verify a target role from your resume. Please try uploading a clearer PDF or DOCX.");
+      }
+
+      const skillsArr = Array.isArray(result.skills) ? result.skills : (result.data?.skills || []);
+      setExtractedSkillsCount(skillsArr.length);
 
       // Mark Step 1, 2, 3 as complete and move to Step 4
       setCompletedIndexSteps([0, 1, 2]);
       setCurrentIndexStep(3);
-      setIndexedSkillsCount(skillsCount);
-      if (detected) setDetectedRoleName(detected);
+      setDetectedRoleName(detected);
       setProgress(85);
 
       // Guaranteed dwell on Step 4 so user clearly sees the 4th index finish and verify their role
@@ -303,19 +307,19 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
       setTimeout(() => {
         onSuccess({
           parsedData: result.data || {
-            skills: result.skills || [],
+            skills: skillsArr,
             experience: result.experience || [],
             education: result.education || [],
-            keywords: result.skills || []
+            keywords: skillsArr
           },
           text: result.text,
           detectedRole: detected,
-          currentRole: result.currentRole,
-          detectedIndustry: result.detectedIndustry,
-          candidateName: result.candidateName,
-          roleReasoning: result.roleReasoning,
-          suggestedTargetRoles: result.suggestedTargetRoles || [],
-          skills: result.skills || [],
+          currentRole: result.currentRole || detected,
+          roleReasoning: result.roleReasoning || '',
+          suggestedTargetRoles: Array.isArray(result.suggestedTargetRoles) ? result.suggestedTargetRoles : [],
+          detectedIndustry: result.detectedIndustry || '',
+          yearsOfExperience: result.yearsOfExperience || 0,
+          candidateName: result.candidateName || '',
           base64,
           mimeType,
           filename: file.name,
@@ -483,10 +487,10 @@ export function ResumeUpload({ onSuccess, userId, onNavigate, isAdmin }: ResumeU
                         )}
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                        {idx === 2 && indexedSkillsCount > 0
-                          ? `Indexed ${indexedSkillsCount} verified skills & competencies`
-                          : idx === 3 && detectedRoleName 
-                            ? `Identified Profile: ${detectedRoleName}` 
+                        {idx === 2 && extractedSkillsCount > 0
+                          ? `Indexed ${extractedSkillsCount} verified skills & experience sections`
+                          : idx === 3 && detectedRoleName
+                            ? `Assigned Target Role: ${detectedRoleName}`
                             : s.desc}
                       </p>
                     </div>

@@ -33,25 +33,6 @@ import { SupportDeskModal } from './components/SupportDeskModal';
 
 type AppState = 'landing' | 'auth' | 'onboarding' | 'dashboard' | 'public_view';
 
-const FALLBACK_ATS_DATA = {
-  score: 75,
-  label: "Moderate Traction",
-  color: "amber",
-  breakdown: [
-    { criterion: 'Technical Skills', score: 80, max: 100 },
-    { criterion: 'Experience Depth', score: 70, max: 100 },
-    { criterion: 'Education Match', score: 75, max: 100 },
-    { criterion: 'Visual Formatting', score: 80, max: 100 },
-    { criterion: 'Keyword Coverage', score: 70, max: 100 },
-    { criterion: 'Impact & Metrics', score: 75, max: 100 }
-  ],
-  priority_fixes: [
-    { problem: "Low Quantitative Impact", impact: "Recruiters and ATS favor resumes with clear metrics.", fix: "Incorporate more quantitative metrics and KPIs in your experience descriptions.", severity: "High" },
-    { problem: "Keyword Mismatch", impact: "Standardized titles help you rank higher in search results.", fix: "Ensure technical key terms precisely match modern standardized titles.", severity: "High" },
-    { problem: "Structural Flow", impact: "ATS parsers may miss skills if they aren't positioned correctly.", fix: "Improve formatting layout to highlight core technical proficiencies first.", severity: "Medium" }
-  ]
-};
-
 const FALLBACK_ROADMAP_DATA: RoadmapData = {
   title: "Personalized Flight Path",
   sprints: [
@@ -129,12 +110,17 @@ export default function App() {
   const [isOnboardingPromptingTarget, setIsOnboardingPromptingTarget] = useState(false);
   const [pendingResumeData, setPendingResumeData] = useState<{ text: string; filename: string; userId: string } | null>(null);
   const [pendingParsedData, setPendingParsedData] = useState<any>(null);
+  const [pendingRoleAnalysis, setPendingRoleAnalysis] = useState<{
+    detectedRole: string;
+    currentRole?: string;
+    roleReasoning?: string;
+    detectedIndustry?: string;
+    candidateName?: string;
+    skills?: string[];
+    suggestedTargetRoles?: Array<{ role: string; matchPercent: number; reason: string }>;
+  } | null>(null);
   const [targetRole, setTargetRole] = useState<string>("Career Search");
   const [targetRegion, setTargetRegion] = useState<string>("Global");
-  const [roleReasoning, setRoleReasoning] = useState<string>('');
-  const [suggestedTargetRoles, setSuggestedTargetRoles] = useState<Array<{ role: string; matchPercent: number; reason?: string }>>([]);
-  const [detectedIndustry, setDetectedIndustry] = useState<string>('');
-  const [candidateSkills, setCandidateSkills] = useState<string[]>([]);
   const [marketAnalysis, setMarketAnalysis] = useState<any>(null);
   const [temporaryRoadmap, setTemporaryRoadmap] = useState<any | null>(null);
 
@@ -362,11 +348,10 @@ export default function App() {
     userId: string; 
     detectedRole?: string; 
     currentRole?: string;
+    roleReasoning?: string;
+    suggestedTargetRoles?: Array<{ role: string; matchPercent: number; reason: string }>;
     detectedIndustry?: string;
     candidateName?: string;
-    roleReasoning?: string;
-    suggestedTargetRoles?: Array<{ role: string; matchPercent: number; reason?: string }>;
-    skills?: string[];
     parsedData?: any;
     extractionMethod?: string;
   }) => {
@@ -377,38 +362,37 @@ export default function App() {
       return;
     }
 
-    const detectedTarget = (data.detectedRole || '').trim() || (data.parsedData?.experience?.[0]?.role || '').trim() || "Professional";
-    const reasoning = (data.roleReasoning || '').trim();
-    const suggestions = Array.isArray(data.suggestedTargetRoles) && data.suggestedTargetRoles.length > 0 
-      ? data.suggestedTargetRoles 
-      : [
-          { role: detectedTarget, matchPercent: 96, reason: "Direct primary alignment with indexed projects & skills" },
-          ...(detectedTarget !== "Full Stack Developer" ? [{ role: "Full Stack Developer", matchPercent: 88, reason: "Broad technical competency" }] : []),
-          ...(detectedTarget !== "AI Systems Engineer" ? [{ role: "AI Systems Engineer", matchPercent: 84, reason: "Modern toolchain alignment" }] : [])
-        ];
-    const skills = Array.isArray(data.skills) && data.skills.length > 0
-      ? data.skills
-      : (data.parsedData?.skills || []);
-    const industry = (data.detectedIndustry || "Technology").trim();
+    const detectedTarget = (data.detectedRole || '').trim() || data.suggestedTargetRoles?.[0]?.role?.trim() || '';
+    if (!detectedTarget) {
+      toast.error("AI could not verify your target role from the resume. Please upload again.");
+      setIsProcessing(false);
+      return;
+    }
 
+    const extractedSkills: string[] = Array.isArray(data.parsedData?.skills) ? data.parsedData.skills : [];
     const structuredData = data.parsedData || {
-      skills: skills,
-      experience: [{ role: detectedTarget, company: "", years: 2, bullets: [] }],
+      skills: extractedSkills,
+      experience: [{ role: data.currentRole || detectedTarget, company: "", years: 2, bullets: [] }],
       education: [],
       projects: [],
-      keywords: skills
+      keywords: extractedSkills.length > 0 ? extractedSkills : [detectedTarget]
     };
 
     setPendingResumeData(data);
     setPendingParsedData(structuredData);
+    setPendingRoleAnalysis({
+      detectedRole: detectedTarget,
+      currentRole: data.currentRole,
+      roleReasoning: data.roleReasoning,
+      detectedIndustry: data.detectedIndustry,
+      candidateName: data.candidateName,
+      skills: extractedSkills,
+      suggestedTargetRoles: data.suggestedTargetRoles || []
+    });
     setTargetRole(detectedTarget);
     setTargetRegion("Global");
-    setRoleReasoning(reasoning);
-    setSuggestedTargetRoles(suggestions);
-    setDetectedIndustry(industry);
-    setCandidateSkills(skills);
 
-    toast.success(`Gemini AI Verified Candidate Role: ${detectedTarget}`);
+    toast.success(`Gemini AI Assigned Target Role: ${detectedTarget}`);
 
     // Seamlessly transition to Target Role confirmation board
     setIsProcessing(false);
@@ -471,6 +455,7 @@ export default function App() {
       setIsOnboardingPromptingTarget(false);
       setPendingResumeData(null);
       setPendingParsedData(null);
+      setPendingRoleAnalysis(null);
 
       setAppState('dashboard');
       setActiveTab('dashboard'); 
@@ -512,16 +497,16 @@ export default function App() {
         if (atsDataSnap) {
           setAtsData(atsDataSnap);
         } else {
-          let ats;
           try {
-            ats = await geminiService.getATSScore(item.text, undefined, user?.uid);
+            const roleForAudit = matchedRole || targetRole || 'Software Engineer';
+            const ats = await geminiService.getATSScore(item.text, roleForAudit, user?.uid);
+            setAtsData(ats);
+            await mongoApi.saveAtsResult(user?.uid || '', resumeId, ats);
           } catch (atsErr: any) {
-            console.error("Historical ATS score calculation failed, fallback", atsErr);
-            ats = FALLBACK_ATS_DATA;
-            toast.error("ATS calculation failed; restored historical context with safety parameters.");
+            console.error("Historical ATS score calculation failed:", atsErr);
+            setAtsData(null);
+            toast.error(atsErr?.message || "ATS audit temporarily unavailable. Please try again.");
           }
-          setAtsData(ats);
-          await mongoApi.saveAtsResult(user?.uid || '', resumeId, ats);
         }
       }
 
@@ -713,51 +698,48 @@ export default function App() {
                 Enter your desired career landing role. Based on your target selection, Career Nav AI will evaluate your profile and compile your custom 6-month learning journey.
               </p>
 
-              {/* AI Verification & Evidence Card */}
-              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                      <CheckCircle2 className="w-5 h-5" />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-mono">
-                        AI Verified Candidate Profile
-                      </div>
-                      <div className="text-sm font-black text-foreground truncate">
-                        {targetRole}
-                      </div>
-                    </div>
+              {/* Gemini AI Verification Indicator & Evidence */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-2.5">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircle2 className="w-5 h-5" />
                   </div>
-                  {detectedIndustry && (
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0 font-mono">
-                      {detectedIndustry}
-                    </span>
-                  )}
-                </div>
-
-                {roleReasoning && (
-                  <p className="text-xs text-muted-foreground leading-relaxed pl-2 border-l-2 border-emerald-500/40">
-                    <span className="font-semibold text-foreground">AI Evidence: </span>
-                    {roleReasoning}
-                  </p>
-                )}
-
-                {candidateSkills.length > 0 && (
-                  <div className="space-y-1.5 pt-1">
-                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block font-mono">
-                      Verified Competency Markers:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {candidateSkills.slice(0, 6).map((skill, sIdx) => (
-                        <span 
-                          key={sIdx}
-                          className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-background/80 text-foreground border border-border/70"
-                        >
-                          {skill}
+                  <div className="text-left min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-mono">
+                        All 4 Resume Indexes Verified by Gemini AI
+                      </span>
+                      {pendingRoleAnalysis?.detectedIndustry && (
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                          {pendingRoleAnalysis.detectedIndustry}
                         </span>
-                      ))}
+                      )}
                     </div>
+                    <div className="text-xs font-bold text-foreground mt-0.5">
+                      AI Assigned Target Role: <span className="text-primary font-black">{pendingRoleAnalysis?.detectedRole || targetRole}</span>
+                    </div>
+                    {pendingRoleAnalysis?.roleReasoning && (
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                        {pendingRoleAnalysis.roleReasoning}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {pendingRoleAnalysis?.skills && pendingRoleAnalysis.skills.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1 border-t border-emerald-500/15">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground self-center mr-1 font-mono">
+                      Extracted Skills:
+                    </span>
+                    {pendingRoleAnalysis.skills.slice(0, 6).map((skill, idx) => (
+                      <span key={idx} className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-background/70 border border-border/60 text-foreground">
+                        {skill}
+                      </span>
+                    ))}
+                    {pendingRoleAnalysis.skills.length > 6 && (
+                      <span className="text-[10px] font-bold text-muted-foreground self-center">
+                        +{pendingRoleAnalysis.skills.length - 6} more
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -772,7 +754,7 @@ export default function App() {
                 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-foreground uppercase tracking-widest block font-mono">
-                    Desired Target Job Role
+                    Desired Target Job Role (Auto-Detected — Edit Anytime)
                   </label>
                   <div className="relative">
                     <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -781,7 +763,7 @@ export default function App() {
                       type="text"
                       value={targetRole}
                       onChange={(e) => setTargetRole(e.target.value)}
-                      placeholder="e.g. Data Analyst, Backend Developer, Product Manager..."
+                      placeholder="e.g. Data Analyst, Agentic AI Developer, Digital Marketer..."
                       className="w-full bg-muted/45 border border-border rounded-xl h-11 sm:h-12 pl-11 pr-4 text-xs font-bold focus:outline-none focus:border-[#2563EB] transition-all text-foreground"
                       required
                       autoFocus
@@ -789,38 +771,63 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Dynamic AI Role Suggestions */}
+                {/* 4 AI-Recommended Target Roles & Transferable Pathways */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block font-mono">
-                      AI Recommended Target Pathways:
-                    </span>
-                    <span className="text-[9px] text-muted-foreground">Click to select</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {suggestedTargetRoles.map((item, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setTargetRole(item.role)}
-                        className={cn(
-                          "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer border",
-                          targetRole === item.role 
-                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                            : "bg-muted/40 hover:bg-muted text-foreground border-border/60 hover:border-primary/40"
-                        )}
-                      >
-                        <span>{item.role}</span>
-                        <span className={cn(
-                          "text-[10px] font-black px-1.5 py-0.5 rounded-md font-mono",
-                          targetRole === item.role
-                            ? "bg-white/20 text-white"
-                            : "bg-primary/10 text-primary"
-                        )}>
-                          {item.matchPercent}% Match
-                        </span>
-                      </button>
-                    ))}
+                  <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block font-mono">
+                    {pendingRoleAnalysis?.suggestedTargetRoles && pendingRoleAnalysis.suggestedTargetRoles.length > 0
+                      ? "Transferable Pathways & Best-Fit Roles (1-Click Select):"
+                      : "Quick Role Suggestions:"}
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {(pendingRoleAnalysis?.suggestedTargetRoles && pendingRoleAnalysis.suggestedTargetRoles.length > 0
+                      ? pendingRoleAnalysis.suggestedTargetRoles.slice(0, 4)
+                      : [
+                          { role: targetRole || "Full Stack Developer", matchPercent: 92, reason: "Direct core stack match" },
+                          { role: "Frontend Developer", matchPercent: 80, reason: "UI architecture alignment" },
+                          { role: "Backend Developer", matchPercent: 78, reason: "API & data pipeline overlap" },
+                          { role: "Software Engineer", matchPercent: 75, reason: "Broad engineering track" }
+                        ]
+                    ).map((item, idx) => {
+                      const isSelected = targetRole.trim().toLowerCase() === item.role.trim().toLowerCase();
+                      return (
+                        <button
+                          key={`${item.role}-${idx}`}
+                          type="button"
+                          onClick={() => setTargetRole(item.role)}
+                          className={cn(
+                            "p-2.5 rounded-xl border transition-all text-left cursor-pointer flex flex-col gap-1",
+                            isSelected
+                              ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20"
+                              : "bg-blue-50/40 hover:bg-blue-50 dark:bg-zinc-900 dark:hover:bg-zinc-850 text-foreground border-blue-500/15"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2 w-full">
+                            <span className={cn(
+                              "text-[11px] font-black leading-tight truncate",
+                              isSelected ? "text-white" : "text-blue-700 dark:text-blue-300"
+                            )}>
+                              {item.role}
+                            </span>
+                            {item.matchPercent ? (
+                              <span className={cn(
+                                "text-[9px] font-mono font-black px-1.5 py-0.5 rounded shrink-0",
+                                isSelected ? "bg-white/20 text-white" : "bg-blue-500/10 text-blue-700 dark:text-blue-300"
+                              )}>
+                                {item.matchPercent}%
+                              </span>
+                            ) : null}
+                          </div>
+                          {item.reason && (
+                            <span className={cn(
+                              "text-[10px] leading-snug line-clamp-2",
+                              isSelected ? "text-blue-100" : "text-muted-foreground"
+                            )}>
+                              {item.reason}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -856,6 +863,7 @@ export default function App() {
                       setIsOnboardingPromptingTarget(false);
                       setPendingResumeData(null);
                       setPendingParsedData(null);
+                      setPendingRoleAnalysis(null);
                     }}
                     className="w-full sm:w-1/3 rounded-xl h-11 sm:h-12 text-xs font-bold uppercase tracking-wider cursor-pointer border-gray-200 dark:border-zinc-800"
                   >
