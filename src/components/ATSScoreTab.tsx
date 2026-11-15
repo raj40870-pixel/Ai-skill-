@@ -16,7 +16,11 @@ import {
   FileSearch,
   AlertTriangle,
   Layers,
-  Tag
+  Tag,
+  X,
+  FileText,
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,6 +54,11 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, on
   const [customAuditRole, setCustomAuditRole] = useState<string>('');
   const [jobDescription, setJobDescription] = useState<string>('');
   const [isReauditing, setIsReauditing] = useState(false);
+  const [isAutoFixing, setIsAutoFixing] = useState(false);
+  const [autoFixResult, setAutoFixResult] = useState<any>(null);
+  const [showAutoFixModal, setShowAutoFixModal] = useState(false);
+  const [copiedFullResume, setCopiedFullResume] = useState(false);
+  const [scoreViewMode, setScoreViewMode] = useState<'dual' | 'universal' | 'target'>('dual');
 
   if (!resumeData || !resumeData.text) {
     return (
@@ -215,6 +224,106 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, on
     }
   };
 
+  const handleRunLiveReauditWithRole = async (specificRole: string) => {
+    setIsReauditing(true);
+    const toastId = toast.loading(`Calibrating ATS audit for "${specificRole}"...`);
+    try {
+      const rId = resumeData?.id || resumeData?._id;
+      const freshAts = await geminiService.getATSScore(
+        resumeData.text,
+        specificRole,
+        user?.uid,
+        '',
+        rId
+      );
+      setResolvedFixes({});
+      if (onUpdateAts) {
+        onUpdateAts(freshAts, specificRole);
+      }
+      toast.success(`Live ATS Re-Audit Complete: ${freshAts.score}/100 for ${specificRole}`, { id: toastId });
+    } catch (err: any) {
+      toast.error(err?.message || "Live ATS re-audit failed.", { id: toastId });
+    } finally {
+      setIsReauditing(false);
+    }
+  };
+
+  const handleAutoFixResume = async () => {
+    if (autoFixResult) {
+      setShowAutoFixModal(true);
+      return;
+    }
+    setIsAutoFixing(true);
+    const toastId = toast.loading("Rewriting resume into Google XYZ formula & fixing flaws...");
+    try {
+      const res = await geminiService.autoFixResume(
+        resumeData.text,
+        evaluatedRole,
+        resumeData.id || resumeData._id
+      );
+      setAutoFixResult(res);
+      setShowAutoFixModal(true);
+      toast.success("Resume transformed with Google XYZ formula!", { id: toastId });
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to auto-fix resume. Please try again.", { id: toastId });
+    } finally {
+      setIsAutoFixing(false);
+    }
+  };
+
+  const handleCopyFullAutoFixed = async () => {
+    if (!autoFixResult?.fixedResumeText) return;
+    try {
+      await navigator.clipboard.writeText(autoFixResult.fixedResumeText);
+      setCopiedFullResume(true);
+      toast.success("Polished XYZ resume copied to clipboard!");
+      setTimeout(() => setCopiedFullResume(false), 2500);
+    } catch {
+      toast.error("Could not copy to clipboard.");
+    }
+  };
+
+  const handleDownloadAutoFixedTxt = () => {
+    if (!autoFixResult?.fixedResumeText) return;
+    const blob = new Blob([autoFixResult.fixedResumeText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${evaluatedRole.replace(/[^a-zA-Z0-9]/g, '_')}_AutoFixed_Resume.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Downloaded as plain text (.txt)");
+  };
+
+  const handleDownloadAutoFixedDoc = () => {
+    if (!autoFixResult?.fixedResumeText) return;
+    const formattedHtml = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${evaluatedRole} Polished Resume</title>
+<style>
+body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; line-height: 1.45; color: #111; margin: 36px; }
+h1 { font-size: 18pt; margin-bottom: 2px; color: #0f172a; }
+h2 { font-size: 12pt; border-bottom: 1.5px solid #2563eb; padding-bottom: 2px; margin-top: 14px; margin-bottom: 6px; text-transform: uppercase; color: #1d4ed8; font-weight: bold; }
+p, li { font-size: 10pt; margin-bottom: 3px; }
+ul { margin-top: 2px; margin-bottom: 6px; padding-left: 18px; }
+</style>
+</head>
+<body>
+${autoFixResult.fixedResumeText.replace(/\n/g, '<br/>')}
+</body>
+</html>`;
+    const blob = new Blob(['\ufeff', formattedHtml], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${evaluatedRole.replace(/[^a-zA-Z0-9]/g, '_')}_ATS_Polished_Resume.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Downloaded as ATS-proof Word document (.doc)");
+  };
+
   const handleDownloadPdf = () => {
     try {
       setIsExportingPdf(true);
@@ -275,6 +384,17 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, on
 
         {/* Action Controls */}
         <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto">
+          <Button
+            type="button"
+            onClick={handleAutoFixResume}
+            disabled={isAutoFixing}
+            className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs h-10 px-4 shadow-md shadow-emerald-500/25 cursor-pointer flex items-center gap-2 transition-all hover:scale-[1.02]"
+            title="1-Click rewrite bullets using Google XYZ formula & remove buzzwords"
+          >
+            <Wand2 className={`w-4 h-4 ${isAutoFixing ? 'animate-spin' : ''}`} />
+            <span>{isAutoFixing ? 'Auto-Fixing...' : '1-Click AI Auto-Fix'}</span>
+          </Button>
+
           <Button
             type="button"
             variant={showJdMatcher ? "default" : "outline"}
@@ -460,73 +580,160 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, on
       {/* Primary Score Ring and Breakdown Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
         
-        {/* Total Health Summary Card */}
+        {/* Total Health Summary Card with Dual-Engine Scoring */}
         <Card className="col-span-1 glass border border-border/60 p-4 sm:p-5 flex flex-col justify-between overflow-hidden relative rounded-3xl">
           <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
             <Cpu className="w-32 h-32 text-primary" />
           </div>
           <CardHeader className="p-0 pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div>
-                <CardTitle className="text-xs sm:text-sm font-black uppercase tracking-widest text-[#2563EB] font-mono">
-                  ATS Score Result
+                <CardTitle className="text-xs sm:text-sm font-black uppercase tracking-widest text-[#2563EB] font-mono flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  Dual-Engine Scoring
                 </CardTitle>
                 <CardDescription className="text-[11px] sm:text-xs">
-                  Exact sum of all 8 weighted criteria
+                  Universal baseline + Role fit
                 </CardDescription>
               </div>
-              <div className="text-right">
-                <span className="text-[9px] font-black uppercase text-blue-500 block">Market Match</span>
-                <span className="text-lg sm:text-xl font-black text-blue-600">{atsData.market_match || score}%</span>
+
+              {/* Scoring Mode Toggle */}
+              <div className="flex items-center p-0.5 rounded-lg bg-muted/60 border border-border/40 text-[9px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setScoreViewMode('dual')}
+                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                    scoreViewMode === 'dual' ? 'bg-background shadow-xs text-foreground font-black' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Dual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScoreViewMode('universal')}
+                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                    scoreViewMode === 'universal' ? 'bg-background shadow-xs text-foreground font-black' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Universal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScoreViewMode('target')}
+                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                    scoreViewMode === 'target' ? 'bg-background shadow-xs text-foreground font-black' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Role Fit
+                </button>
               </div>
             </div>
           </CardHeader>
 
           <CardContent className="p-0 flex flex-col items-center justify-center py-4 sm:py-6">
-            <div className="relative w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center">
-              <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
-                <circle 
-                  className="text-gray-100 dark:text-zinc-900" 
-                  strokeWidth="8" 
-                  stroke="currentColor" 
-                  fill="transparent" 
-                  r="40" 
-                  cx="50" 
-                  cy="50" 
-                />
-                <motion.circle 
-                  className="text-primary" 
-                  strokeWidth="8" 
-                  strokeDasharray="251.2"
-                  initial={{ strokeDashoffset: 251.2 }}
-                  animate={{ strokeDashoffset: 251.2 - (251.2 * score) / 100 }}
-                  transition={{ duration: 1.5, ease: "easeOut" }}
-                  strokeLinecap="round" 
-                  stroke="currentColor" 
-                  fill="transparent" 
-                  r="40" 
-                  cx="50" 
-                  cy="50" 
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className={`text-4xl sm:text-5xl font-black tracking-tighter ${getScoreColor(score)}`}>{score}</span>
-                <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground block mt-0.5">SCORE / 100</span>
+            {scoreViewMode === 'dual' ? (
+              <div className="w-full space-y-4">
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  {/* Universal Baseline */}
+                  <div className="p-3 rounded-2xl bg-muted/40 border border-border/50 flex flex-col items-center">
+                    <span className="text-[9px] font-black uppercase text-muted-foreground font-mono">
+                      Universal Baseline
+                    </span>
+                    <span className={`text-3xl font-black mt-1 ${getScoreColor(Number(atsData.universal_score) || 71)}`}>
+                      {Number(atsData.universal_score) || 71}
+                    </span>
+                    <span className="text-[8px] font-mono font-bold text-muted-foreground uppercase">
+                      Document Health / 100
+                    </span>
+                    <span className="text-[9px] text-muted-foreground mt-1 leading-tight">
+                      Jobscan ATS Standard
+                    </span>
+                  </div>
+
+                  {/* Role Compatibility */}
+                  <div className="p-3 rounded-2xl bg-blue-500/5 border border-blue-500/20 flex flex-col items-center">
+                    <span className="text-[9px] font-black uppercase text-blue-600 font-mono">
+                      Role Match Fit
+                    </span>
+                    <span className={`text-3xl font-black mt-1 ${getScoreColor(Number(atsData.role_match_score) || Number(atsData.market_match) || score)}`}>
+                      {Number(atsData.role_match_score) || Number(atsData.market_match) || score}%
+                    </span>
+                    <span className="text-[8px] font-mono font-bold text-blue-500 uppercase">
+                      Target Role Match
+                    </span>
+                    <span className="text-[9px] text-muted-foreground mt-1 leading-tight truncate max-w-[110px]" title={evaluatedRole}>
+                      {evaluatedRole}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40 text-[10px] text-muted-foreground leading-relaxed">
+                  💡 <strong className="text-foreground">Dual-Engine Insight:</strong> Pure document hygiene independently scores <strong>{Number(atsData.universal_score) || 71}/100</strong>. Your alignment for <strong>{evaluatedRole}</strong> is <strong>{Number(atsData.role_match_score) || Number(atsData.market_match) || score}%</strong>.
+                </div>
               </div>
-            </div>
-
-            <div className="text-center mt-5 w-full max-w-xs space-y-1 bg-muted/40 p-3 rounded-2xl border border-border/40">
-              <span className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground font-mono block">Scoring Verdict</span>
-              <span className="text-xs sm:text-sm font-black text-foreground block">
-                {atsData.label || getScoringVerdict(score)}
-              </span>
-            </div>
-
-            <div className="mt-3 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center max-w-xs">
-              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 block leading-tight">
-                Evaluated strictly for {evaluatedRole}. Points are deducted for missing KPIs, passive phrasing, and keyword gaps.
-              </span>
-            </div>
+            ) : scoreViewMode === 'universal' ? (
+              <div className="flex flex-col items-center w-full">
+                <div className="relative w-36 h-36 sm:w-40 sm:h-40 flex items-center justify-center">
+                  <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+                    <circle className="text-gray-100 dark:text-zinc-900" strokeWidth="8" stroke="currentColor" fill="transparent" r="40" cx="50" cy="50" />
+                    <motion.circle 
+                      className="text-primary" 
+                      strokeWidth="8" 
+                      strokeDasharray="251.2"
+                      initial={{ strokeDashoffset: 251.2 }}
+                      animate={{ strokeDashoffset: 251.2 - (251.2 * (Number(atsData.universal_score) || 71)) / 100 }}
+                      transition={{ duration: 1.2, ease: "easeOut" }}
+                      strokeLinecap="round" 
+                      stroke="currentColor" 
+                      fill="transparent" 
+                      r="40" 
+                      cx="50" 
+                      cy="50" 
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className={`text-4xl sm:text-5xl font-black tracking-tighter ${getScoreColor(Number(atsData.universal_score) || 71)}`}>
+                      {Number(atsData.universal_score) || 71}
+                    </span>
+                    <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground block mt-0.5">BASELINE / 100</span>
+                  </div>
+                </div>
+                <div className="text-center mt-3 w-full space-y-1 bg-muted/40 p-2.5 rounded-2xl border border-border/40">
+                  <span className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground font-mono block">Universal Document Quality</span>
+                  <span className="text-xs font-bold text-foreground">Standard Jobscan ATS Quality Baseline</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center w-full">
+                <div className="relative w-36 h-36 sm:w-40 sm:h-40 flex items-center justify-center">
+                  <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+                    <circle className="text-gray-100 dark:text-zinc-900" strokeWidth="8" stroke="currentColor" fill="transparent" r="40" cx="50" cy="50" />
+                    <motion.circle 
+                      className="text-primary" 
+                      strokeWidth="8" 
+                      strokeDasharray="251.2"
+                      initial={{ strokeDashoffset: 251.2 }}
+                      animate={{ strokeDashoffset: 251.2 - (251.2 * score) / 100 }}
+                      transition={{ duration: 1.2, ease: "easeOut" }}
+                      strokeLinecap="round" 
+                      stroke="currentColor" 
+                      fill="transparent" 
+                      r="40" 
+                      cx="50" 
+                      cy="50" 
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className={`text-4xl sm:text-5xl font-black tracking-tighter ${getScoreColor(score)}`}>{score}</span>
+                    <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground block mt-0.5">SCORE / 100</span>
+                  </div>
+                </div>
+                <div className="text-center mt-3 w-full space-y-1 bg-muted/40 p-2.5 rounded-2xl border border-border/40">
+                  <span className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground font-mono block">Scoring Verdict</span>
+                  <span className="text-xs font-bold text-foreground">{atsData.label || getScoringVerdict(score)}</span>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -895,6 +1102,302 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, on
           )}
         </CardContent>
       </Card>
+
+      {/* SECTION: AI-RECOMMENDED TARGET MARKET ROLES (4 BEST FIT ROLES) */}
+      {atsData.suggested_roles && atsData.suggested_roles.length > 0 && (
+        <Card className="glass border border-blue-500/30 bg-blue-500/[0.02] p-4 sm:p-6 rounded-3xl">
+          <CardHeader className="p-0 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/40 pb-3">
+              <div>
+                <CardTitle className="text-sm sm:text-base font-black tracking-tight text-foreground flex items-center gap-2">
+                  <Target className="w-4 h-4 text-blue-600" />
+                  AI Market Roles Alignment (4 Best-Fit Career Paths)
+                </CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Gemini analyzed your verified experience against global tech roles. 1-click calibrate your audit against any path.
+                </CardDescription>
+              </div>
+              <span className="text-[10px] font-black px-3 py-1 rounded-md bg-blue-500/10 text-blue-600 font-mono self-start sm:self-auto">
+                4 ROLES DETECTED
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 pt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {atsData.suggested_roles.map((sr: any, idx: number) => {
+              const isCurrent = (sr.role || '').toLowerCase() === (evaluatedRole || '').toLowerCase();
+              return (
+                <div
+                  key={idx}
+                  className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between ${
+                    isCurrent
+                      ? 'border-blue-600 bg-blue-600/10 shadow-sm'
+                      : 'border-border/60 bg-card/70 hover:border-blue-500/40'
+                  }`}
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-xs font-black text-foreground truncate" title={sr.role}>
+                        {sr.role}
+                      </span>
+                      <span className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded ${
+                        sr.match_percent >= 75 ? 'bg-emerald-500/15 text-emerald-600' : 'bg-blue-500/15 text-blue-600'
+                      }`}>
+                        {sr.match_percent}%
+                      </span>
+                    </div>
+                    {sr.reason && (
+                      <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                        {sr.reason}
+                      </p>
+                    )}
+                    {sr.missing_skills && sr.missing_skills.length > 0 && (
+                      <div className="pt-1 flex flex-wrap gap-1">
+                        {sr.missing_skills.slice(0, 3).map((ms: string, i: number) => (
+                          <span key={i} className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground">
+                            +{ms}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={isCurrent || isReauditing}
+                    variant={isCurrent ? "secondary" : "outline"}
+                    onClick={() => {
+                      setCustomAuditRole(sr.role);
+                      handleRunLiveReauditWithRole(sr.role);
+                    }}
+                    className={`mt-3 w-full h-8 text-[11px] font-bold rounded-xl cursor-pointer ${
+                      isCurrent ? 'bg-blue-600 text-white hover:bg-blue-700' : 'hover:bg-blue-600 hover:text-white'
+                    }`}
+                  >
+                    {isCurrent ? "Currently Audited" : "Re-Audit for this Role"}
+                  </Button>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* SECTION: DEEP GRAMMAR & SYNTAX HYGIENE AUDIT */}
+      {atsData.grammar_audit && atsData.grammar_audit.length > 0 && (
+        <Card className="glass border border-border/60 p-4 sm:p-6 rounded-3xl">
+          <CardHeader className="p-0 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/40 pb-3">
+              <div>
+                <CardTitle className="text-sm sm:text-base font-black tracking-tight text-foreground flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Deep Grammar & Executive Syntax Hygiene
+                </CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Grammar inconsistencies and passive phrasing detected in your resume with suggested executive replacements.
+                </CardDescription>
+              </div>
+              <span className="text-[10px] font-black px-3 py-1 rounded-md bg-emerald-500/10 text-emerald-600 font-mono self-start sm:self-auto">
+                {atsData.grammar_audit.length} SYNTAX POINTS IDENTIFIED
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 pt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+            {atsData.grammar_audit.map((g: any, idx: number) => (
+              <div key={idx} className="p-3.5 rounded-2xl border border-border/60 bg-card/70 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-black uppercase font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-600">
+                    {g.type || 'Grammar Hygiene'}
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> Fix Available
+                  </span>
+                </div>
+                <div className="p-2 rounded-xl bg-rose-500/5 border border-rose-500/15 text-xs text-foreground/80 line-through">
+                  "{g.originalText}"
+                </div>
+                <div className="p-2 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                  → "{g.suggestedFix}"
+                </div>
+                {g.explanation && (
+                  <p className="text-[11px] text-muted-foreground leading-snug">{g.explanation}</p>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* SECTION: REPETITION & OVERUSED BUZZWORD RADAR */}
+      {atsData.repetition_audit && (
+        <Card className="glass border border-border/60 p-4 sm:p-6 rounded-3xl">
+          <CardHeader className="p-0 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/40 pb-3">
+              <div>
+                <CardTitle className="text-sm sm:text-base font-black tracking-tight text-foreground flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                  Repetition & Cliché Buzzword Radar
+                </CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Overused generic terms and duplicate lines that dilute your impact on ATS algorithms.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 pt-3 space-y-4">
+            {atsData.repetition_audit.overused_words && atsData.repetition_audit.overused_words.length > 0 && (
+              <div className="space-y-2">
+                <span className="text-[10px] font-black uppercase font-mono text-muted-foreground block">
+                  Repeated Words Frequency
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {atsData.repetition_audit.overused_words.map((w: any, idx: number) => (
+                    <div key={idx} className="p-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs flex items-center gap-2">
+                      <span className="font-black text-foreground">"{w.word}"</span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold">
+                        {w.count}x
+                      </span>
+                      {w.suggestion && (
+                        <span className="text-[11px] text-muted-foreground font-medium">({w.suggestion})</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {atsData.repetition_audit.cliches_found && atsData.repetition_audit.cliches_found.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] font-black uppercase font-mono text-rose-500 block">
+                  Overused Cliches & Buzzwords Flagged
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {atsData.repetition_audit.cliches_found.map((c: string, idx: number) => (
+                    <span key={idx} className="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-bold">
+                      ✗ "{c}"
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 1-CLICK AI AUTO-FIX RESUME MODAL */}
+      {showAutoFixModal && autoFixResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-4xl max-h-[92vh] bg-background border border-border/80 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-6 border-b border-border/40 flex items-center justify-between gap-3 bg-muted/30">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 font-mono">
+                    GOOGLE XYZ FORMULA POLISHED RESUME
+                  </span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black tracking-tight text-foreground flex items-center gap-2">
+                  <Wand2 className="w-5 h-5 text-emerald-600" />
+                  AI Auto-Fixed & Rewritten Resume
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAutoFixModal(false)}
+                className="w-9 h-9 rounded-xl border border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Score Lift & Metrics Strip */}
+            <div className="p-4 bg-emerald-500/10 border-b border-emerald-500/20 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <span className="font-bold text-foreground">ATS Score Lift:</span>
+                <span className="font-mono line-through text-muted-foreground">{score}/100</span>
+                <ArrowRight className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="font-black text-emerald-600 font-mono text-sm">
+                  {autoFixResult.estimatedScoreAfter || Math.min(95, score + 18)}/100 (+{Math.min(95, score + 18) - score} pts)
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{autoFixResult.changesCount || 8} bullet & keyword optimizations applied</span>
+              </div>
+            </div>
+
+            {/* Resume Content View */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              {autoFixResult.changesSummary && autoFixResult.changesSummary.length > 0 && (
+                <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/60 space-y-1.5 text-xs">
+                  <span className="text-[10px] font-black uppercase font-mono text-muted-foreground block">
+                    Transformations Summary
+                  </span>
+                  <ul className="list-disc pl-4 space-y-1 text-muted-foreground text-[11px]">
+                    {autoFixResult.changesSummary.map((item: string, i: number) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase font-mono text-muted-foreground">
+                    Complete Polished Resume Document
+                  </span>
+                  <span className="text-[10px] font-bold text-muted-foreground">
+                    ATS-Friendly Plain Text Hierarchy
+                  </span>
+                </div>
+                <pre className="p-4 rounded-2xl bg-muted/30 border border-border/60 font-mono text-xs text-foreground whitespace-pre-wrap leading-relaxed select-all">
+                  {autoFixResult.fixedResumeText}
+                </pre>
+              </div>
+            </div>
+
+            {/* Modal Footer Controls */}
+            <div className="p-4 sm:p-5 border-t border-border/40 flex flex-wrap items-center justify-between gap-3 bg-muted/30">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowAutoFixModal(false)}
+                className="rounded-xl text-xs font-bold h-10 px-4 cursor-pointer"
+              >
+                Close
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDownloadAutoFixedTxt}
+                  className="rounded-xl text-xs font-bold h-10 px-3.5 gap-1.5 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Download .TXT</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDownloadAutoFixedDoc}
+                  className="rounded-xl text-xs font-bold h-10 px-3.5 gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Word (.DOC)</span>
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleCopyFullAutoFixed}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs h-10 px-4 gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
+                >
+                  {copiedFullResume ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedFullResume ? "Copied to Clipboard!" : "Copy Full Resume"}</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

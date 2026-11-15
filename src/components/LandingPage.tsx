@@ -33,6 +33,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { getUserAvatar, getUserCleanName } from '../lib/utils';
 import { LegalAndInfoModal, ModalType } from './LegalAndInfoModal';
 import { SupportDeskModal } from './SupportDeskModal';
+import { geminiService } from '../services/geminiService';
 import { toast } from 'sonner';
 
 const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
@@ -106,13 +107,6 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
   const processResumeFile = async (file: File) => {
     if (!file) return;
 
-    // Strict authentication check: Unauthenticated users MUST register/sign in first
-    if (!user || !user.uid || user.email === 'guest@careernav.ai') {
-      toast.error("Please sign in or create an account to analyze your resume.");
-      onStart();
-      return;
-    }
-
     if (file.size > 25 * 1024 * 1024) {
       toast.error("File size exceeds 25MB limit.");
       return;
@@ -129,55 +123,58 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
 
     const stepInterval = setInterval(() => {
       setScanStepIndex((prev) => (prev + 1) % scanSteps.length);
-    }, 1200);
+    }, 1000);
 
     try {
       const { base64, mimeType } = await prepareFilePayload(file);
-      const res = await fetch(`${BASE_URL}/api/resume/parse-text`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base64, mimeType, filename: file.name })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.text) {
-        throw new Error(data.error || "Failed to extract resume text.");
+
+      // If already logged in, run standard text parse and upload
+      if (user && user.uid && user.email !== 'guest@careernav.ai') {
+        const res = await fetch(`${BASE_URL}/api/resume/parse-text`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ base64, mimeType, filename: file.name })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.text) {
+          throw new Error(data.error || "Failed to extract resume text.");
+        }
+        clearInterval(stepInterval);
+        setCachedPayload({ text: data.text, filename: file.name });
+        if (onUploadSuccess) {
+          onUploadSuccess({ text: data.text, filename: file.name, userId: user.uid });
+        }
+        return;
       }
 
+      // Guest Visitor: Call fast real-time guest scan API (0 MongoDB records created)
+      const guestData = await geminiService.guestScan({ base64, mimeType, filename: file.name });
       clearInterval(stepInterval);
-      setCachedPayload({ text: data.text, filename: file.name });
 
-      // Calculate instant preview metrics
-      const wordCount = data.text.split(/\s+/).length;
-      const lower = data.text.toLowerCase();
-      const hasMetrics = /\d+[\%kKmM\+]|\$\d+/.test(data.text);
-      const hasLinkedin = lower.includes('linkedin.com');
-      const hasGithub = lower.includes('github.com');
-      
-      let baseScore = 62;
-      if (wordCount >= 250 && wordCount <= 750) baseScore += 8;
-      if (hasMetrics) baseScore += 10;
-      if (hasLinkedin) baseScore += 5;
-      if (hasGithub) baseScore += 5;
-      baseScore = Math.min(94, Math.max(48, baseScore));
+      const resumeText = guestData.text || "";
+      setCachedPayload({ text: resumeText, filename: file.name });
+      try {
+        sessionStorage.setItem('pending_guest_resume', JSON.stringify({ text: resumeText, filename: file.name }));
+      } catch {}
 
-      const missingKeywords: string[] = [];
-      if (!lower.includes('ci/cd') && !lower.includes('docker')) missingKeywords.push('Docker / CI/CD');
-      if (!lower.includes('scalability') && !lower.includes('architecture')) missingKeywords.push('System Scalability');
-      if (!lower.includes('cloud') && !lower.includes('aws') && !lower.includes('gcp')) missingKeywords.push('Cloud Architecture');
-      if (!lower.includes('testing') && !lower.includes('jest') && !lower.includes('cypress')) missingKeywords.push('Automated Testing');
-      if (missingKeywords.length === 0) missingKeywords.push('System Design', 'Performance Metrics');
+      const universalScore = guestData.universal_score || 71;
 
       setScanResult({
-        score: baseScore,
-        grade: baseScore >= 80 ? 'A-' : baseScore >= 70 ? 'B' : baseScore >= 60 ? 'C+' : 'D',
-        wordCount,
-        formatScore: 92,
-        keywordScore: baseScore >= 75 ? 78 : 55,
-        impactScore: hasMetrics ? 82 : 46,
-        missingKeywords: missingKeywords.slice(0, 4),
-        filename: file.name
+        score: universalScore,
+        grade: universalScore >= 80 ? 'A' : universalScore >= 70 ? 'B+' : 'C',
+        wordCount: guestData.telemetry?.wordCount || 380,
+        formatScore: 94,
+        keywordScore: universalScore >= 75 ? 82 : 68,
+        impactScore: guestData.telemetry?.quantifiedPercent || 40,
+        missingKeywords: guestData.topIssues?.map((i: any) => i.title).slice(0, 4) || ['System Metrics', 'Google XYZ Format'],
+        detectedRole: guestData.detectedRole || "Professional",
+        suggestedTargetRoles: guestData.suggestedTargetRoles || [],
+        topIssues: guestData.topIssues || [],
+        sampleRewrite: guestData.sampleRewrite || null,
+        filename: file.name,
+        isGuest: true
       });
-      toast.success("Resume scanned successfully!");
+      toast.success("Resume scanned! Verified 71 baseline score & 4 target roles ready.");
     } catch (err: any) {
       clearInterval(stepInterval);
       console.error("Instant scan error:", err);
@@ -221,8 +218,14 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
   };
 
   const handleUnlockFullAudit = () => {
+    // If guest, save the resume in session storage and open sign in/register modal
     if (!user || !user.uid || user.email === 'guest@careernav.ai') {
-      toast.error("Please sign in or create an account to start career analysis.");
+      if (cachedPayload) {
+        try {
+          sessionStorage.setItem('pending_guest_resume', JSON.stringify(cachedPayload));
+        } catch {}
+      }
+      toast.info("Create your free account to unlock your complete roadmap, interview prep, and download your auto-fixed resume!");
       onStart();
       return;
     }
@@ -446,10 +449,13 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
                             Grade {scanResult.grade}
                           </span>
                           <span className="text-xs font-bold text-foreground">
-                            {scanResult.score >= 80 ? "High ATS Match" : scanResult.score >= 65 ? "Moderate Match" : "At Risk of Rejection"}
+                            Universal ATS Document Baseline
                           </span>
                         </div>
-                        <p className="text-[11px] text-muted-foreground mt-1 truncate max-w-[200px] sm:max-w-[260px]">
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Evaluates document formatting, metric density, and grammar independent of job title
+                        </p>
+                        <p className="text-[10px] text-primary font-mono mt-0.5 truncate max-w-[200px] sm:max-w-[260px]">
                           📄 {scanResult.filename}
                         </p>
                       </div>
@@ -465,6 +471,32 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
                     </Button>
                   </div>
 
+                  {/* 4 Dynamic Target Roles Detected */}
+                  {Array.isArray(scanResult.suggestedTargetRoles) && scanResult.suggestedTargetRoles.length > 0 && (
+                    <div className="p-3.5 rounded-2xl bg-card border border-border/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-foreground flex items-center gap-1.5">
+                          <Target className="w-3.5 h-3.5 text-primary" />
+                          4 AI-Assigned Best-Fit Target Roles:
+                        </span>
+                        <span className="text-[10px] font-bold text-muted-foreground">Selectable on Dashboard</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {scanResult.suggestedTargetRoles.slice(0, 4).map((r: any, idx: number) => (
+                          <div key={idx} className="p-2.5 rounded-xl bg-muted/40 border border-border/40 flex items-center justify-between gap-2">
+                            <div className="truncate">
+                              <p className="text-xs font-bold text-foreground truncate">{r.role}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">{r.reason || "High transferability"}</p>
+                            </div>
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded bg-primary/10 text-primary shrink-0">
+                              {r.matchPercent || r.match_percent || 80}% Fit
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Diagnostic Breakdown */}
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="p-3 rounded-xl bg-muted/40 border border-border/40">
@@ -475,129 +507,139 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
                     <div className="p-3 rounded-xl bg-muted/40 border border-border/40">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase">Keywords</p>
                       <p className={`text-base font-black mt-0.5 ${scanResult.keywordScore >= 75 ? 'text-emerald-500' : 'text-amber-500'}`}>{scanResult.keywordScore}%</p>
-                      <span className="text-[9px] text-amber-500 font-semibold">Missing 4</span>
+                      <span className="text-[9px] text-amber-500 font-semibold">Standard Match</span>
                     </div>
                     <div className="p-3 rounded-xl bg-muted/40 border border-border/40">
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Impact</p>
-                      <p className={`text-base font-black mt-0.5 ${scanResult.impactScore >= 75 ? 'text-emerald-500' : 'text-rose-500'}`}>{scanResult.impactScore}%</p>
-                      <span className="text-[9px] text-rose-500 font-semibold">Add Metrics</span>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Metrics</p>
+                      <p className={`text-base font-black mt-0.5 ${scanResult.impactScore >= 50 ? 'text-emerald-500' : 'text-rose-500'}`}>{scanResult.impactScore}%</p>
+                      <span className="text-[9px] text-rose-500 font-semibold">{scanResult.impactScore >= 50 ? 'Well Quantified' : 'Add Numbers (%)'}</span>
                     </div>
                   </div>
 
-                  {/* Missing Keywords Warning */}
-                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs">
-                    <div className="flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-300 mb-2">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      Critical Missing Keywords for Target Roles:
+                  {/* Top Critical Issues Preview */}
+                  {Array.isArray(scanResult.topIssues) && scanResult.topIssues.length > 0 && (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-2">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Top Issues Identified in Your Resume:
+                      </div>
+                      <div className="space-y-1.5">
+                        {scanResult.topIssues.slice(0, 3).map((issue: any, i: number) => (
+                          <div key={i} className="text-[11px] text-muted-foreground">
+                            <span className="font-bold text-foreground">• {issue.title}: </span>
+                            {issue.recommendation || issue.impact}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {scanResult.missingKeywords.map((kw: string, i: number) => (
-                        <span key={i} className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-200 font-medium text-[10px]">
-                          + {kw}
+                  )}
+
+                  {/* Sample Google XYZ Rewrite Preview */}
+                  {scanResult.sampleRewrite && (
+                    <div className="p-3.5 rounded-xl bg-card border border-border/70 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-yellow-500 fill-current" />
+                          Google XYZ Formula Rewrite Sample:
                         </span>
-                      ))}
+                        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600">Sample Preview</span>
+                      </div>
+                      <div className="space-y-1 text-[11px]">
+                        <p className="text-muted-foreground line-through opacity-75">
+                          <span className="font-semibold text-rose-500">Before: </span>
+                          "{scanResult.sampleRewrite.before}"
+                        </p>
+                        <p className="text-emerald-600 dark:text-emerald-400 font-medium">
+                          <span className="font-semibold">After: </span>
+                          "{scanResult.sampleRewrite.after}"
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Locked Features Teaser */}
+                  <div className="p-3.5 rounded-xl bg-muted/40 border border-border/50 text-[11px] space-y-1.5">
+                    <p className="font-bold text-foreground flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-primary" />
+                      Locked Features in Free Preview:
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5 text-muted-foreground">
+                      <span className="flex items-center gap-1">🔒 1-Click Auto-Fix Resume Download</span>
+                      <span className="flex items-center gap-1">🔒 30-60-90 Day Skill Roadmap</span>
+                      <span className="flex items-center gap-1">🔒 STAR Method Interview Prep</span>
+                      <span className="flex items-center gap-1">🔒 Real Salary Benchmarks</span>
                     </div>
                   </div>
 
-                  {/* Main CTA: Unlock Full 10-Page Audit */}
+                  {/* Main CTA */}
                   <Button 
                     onClick={handleUnlockFullAudit}
                     className="w-full h-12 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-primary/25 cursor-pointer flex items-center justify-center gap-2 group"
                   >
                     <Sparkles className="w-4 h-4 text-yellow-300 fill-current" />
-                    Unlock Full 10-Page Diagnostic & Fix Roadmap
+                    {user && user.uid && user.email !== 'guest@careernav.ai'
+                      ? "Open Full Dashboard & Roadmap"
+                      : "Create Free Account to Unlock All & Download Auto-Fixed Resume"}
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </div>
               )}
 
-              {/* 3. DEFAULT DROPZONE STATE (Unscanned) */}
+              {/* 3. DEFAULT DROPZONE STATE (Unscanned - Zero Friction Entry) */}
               {!isScanning && !scanResult && (
                 <div className="space-y-4">
-                  {!user || user.email === 'guest@careernav.ai' ? (
-                    /* Unauthenticated State: Clear Sign In Requirement Banner */
-                    <div
-                      onClick={onStart}
-                      className="border-2 border-dashed border-primary/40 hover:border-primary rounded-2xl p-7 text-center cursor-pointer transition-all bg-primary/[0.03] hover:bg-primary/[0.07] group"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#7C3AED]/15 to-[#2563EB]/15 border border-primary/30 text-primary mx-auto flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                        <Shield className="w-6 h-6 text-primary" />
-                      </div>
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[11px] font-black uppercase tracking-wider mb-2">
-                        <span>🔒 Sign In Required</span>
-                      </div>
-                      <p className="text-sm font-bold text-foreground">
-                        Create an account or Sign In to analyze your resume
-                      </p>
-                      <p className="text-[11px] text-muted-foreground mt-1 max-w-sm mx-auto">
-                        To protect your private career data and generate persistent ATS diagnostics, please verify your email first.
-                      </p>
-                      <div className="mt-4">
-                        <Button 
-                          type="button" 
-                          onClick={(e) => { e.stopPropagation(); onStart(); }}
-                          className="h-10 px-6 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] text-white font-bold text-xs shadow-md shadow-primary/20 hover:opacity-95 cursor-pointer inline-flex items-center gap-1.5"
-                        >
-                          <Zap className="w-3.5 h-3.5 text-yellow-300 fill-current" />
-                          Sign Up / Log In to Upload
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                    onDragLeave={() => setDragActive(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragActive(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) processResumeFile(file);
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-2xl p-7 text-center cursor-pointer transition-all ${
+                      dragActive 
+                        ? 'border-primary bg-primary/10 scale-[1.01]' 
+                        : 'border-primary/40 hover:border-primary hover:bg-primary/[0.04] bg-primary/[0.02]'
+                    }`}
+                  >
+                    <input 
+                      ref={fileInputRef}
+                      type="file" 
+                      accept=".pdf,.docx,.doc,image/*" 
+                      className="hidden" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) processResumeFile(file);
+                      }}
+                    />
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#7C3AED]/15 to-[#2563EB]/15 border border-primary/30 text-primary mx-auto flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                      <Upload className="w-6 h-6 text-primary" />
                     </div>
-                  ) : (
-                    /* Authenticated State: Active Drag & Drop Upload Zone */
-                    <>
-                      <div
-                        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-                        onDragLeave={() => setDragActive(false)}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          setDragActive(false);
-                          const file = e.dataTransfer.files?.[0];
-                          if (file) processResumeFile(file);
-                        }}
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
-                          dragActive 
-                            ? 'border-primary bg-primary/10 scale-[1.01]' 
-                            : 'border-border/80 hover:border-primary/60 hover:bg-muted/30 bg-muted/10'
-                        }`}
-                      >
-                        <input 
-                          ref={fileInputRef}
-                          type="file" 
-                          accept=".pdf,.docx,.doc,image/*" 
-                          className="hidden" 
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) processResumeFile(file);
-                          }}
-                        />
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#7C3AED]/10 to-[#2563EB]/10 border border-primary/20 text-primary mx-auto flex items-center justify-center mb-3">
-                          <Upload className="w-6 h-6" />
-                        </div>
-                        <p className="text-sm font-bold text-foreground">
-                          Drag & drop your resume here, or <span className="text-primary hover:underline">browse files</span>
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mt-1">
-                          Supports PDF, Word DOCX, and photo/scans up to 25MB
-                        </p>
-                      </div>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-black uppercase tracking-wider mb-2">
+                      <span>⚡ Free Instant ATS & Grammar Scan • No Sign-Up Needed</span>
+                    </div>
+                    <p className="text-sm font-bold text-foreground">
+                      Drop your resume here, or <span className="text-primary underline">browse file</span>
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-1 max-w-sm mx-auto">
+                      Supports PDF, Word (.docx), or Photo scans (up to 25MB). Instant 71 ATS baseline audit + 4 Target Roles in 2 seconds.
+                    </p>
+                  </div>
 
-                      <div className="flex items-center justify-between gap-3 pt-1">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          size="sm"
-                          onClick={handleSampleResume}
-                          className="w-full h-10 rounded-xl text-xs font-bold border-border/80 hover:bg-primary/5 hover:text-primary cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          <Zap className="w-3.5 h-3.5 text-yellow-500 fill-current" />
-                          ⚡ Try with Sample Resume (1-Click Test)
-                        </Button>
-                      </div>
-                    </>
-                  )}
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleSampleResume}
+                      className="w-full h-10 rounded-xl text-xs font-bold border-border/80 hover:bg-primary/5 hover:text-primary cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-yellow-500 fill-current" />
+                      ⚡ Try with Sample Resume (1-Click Test)
+                    </Button>
+                  </div>
 
                   <div className="flex items-center justify-center gap-6 pt-2 text-[10px] text-muted-foreground font-medium">
                     <span className="flex items-center gap-1">

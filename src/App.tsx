@@ -276,6 +276,30 @@ export default function App() {
         setIsOnboardingPromptingTarget(true);
         setAppState('dashboard');
       } else {
+        const pendingGuestStr = sessionStorage.getItem('pending_guest_resume');
+        if (pendingGuestStr) {
+          try {
+            const pendingGuest = JSON.parse(pendingGuestStr);
+            sessionStorage.removeItem('pending_guest_resume');
+            if (pendingGuest && pendingGuest.text) {
+              toast.info("Importing your scanned resume into your account...");
+              await handleUploadSuccess({
+                text: pendingGuest.text,
+                filename: pendingGuest.filename || 'Scanned_Resume.pdf',
+                userId: uid,
+                detectedRole: pendingGuest.suggested_roles?.[0]?.role,
+                suggestedTargetRoles: pendingGuest.suggested_roles?.map((r: any) => ({
+                  role: r.role,
+                  matchPercent: r.match_percent,
+                  reason: r.reason
+                }))
+              });
+              return;
+            }
+          } catch (e) {
+            console.error("Failed to parse pending guest resume", e);
+          }
+        }
         setResumeData(null);
         setActiveResumeId(null);
         setAtsData(null);
