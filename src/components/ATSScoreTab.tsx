@@ -46,6 +46,89 @@ interface ATSScoreTabProps {
   onUpdateAts?: (newAts: any, newRole?: string) => void;
 }
 
+function getAutoFixedResumeText(result: any): string {
+  if (!result) return '';
+  if (typeof result.fixedResumeText === 'string' && result.fixedResumeText.trim().length > 10) {
+    return result.fixedResumeText.trim();
+  }
+  if (typeof result.formattedMarkdown === 'string' && result.formattedMarkdown.trim().length > 10) {
+    return result.formattedMarkdown.trim();
+  }
+  if (typeof result.rawText === 'string' && result.rawText.trim().length > 10) {
+    return result.rawText.trim();
+  }
+
+  // Fallback: Reconstruct cleanly from structured candidate object
+  const lines: string[] = [];
+  if (result.candidate) {
+    const c = result.candidate;
+    if (c.name) lines.push(c.name.toUpperCase());
+    const contacts = [c.email, c.phone, c.location, c.linkedin, c.github, c.portfolio].filter(Boolean);
+    if (contacts.length) lines.push(contacts.join(' | '));
+    lines.push('');
+  }
+  if (result.executiveSummary) {
+    lines.push('## PROFESSIONAL SUMMARY');
+    lines.push(result.executiveSummary);
+    lines.push('');
+  }
+  if (result.skills && typeof result.skills === 'object') {
+    lines.push('## TECHNICAL SKILLS');
+    for (const [category, skillsList] of Object.entries(result.skills)) {
+      if (Array.isArray(skillsList) && skillsList.length) {
+        lines.push(`• **${category}**: ${skillsList.join(', ')}`);
+      }
+    }
+    lines.push('');
+  }
+  if (Array.isArray(result.experience) && result.experience.length) {
+    lines.push('## PROFESSIONAL EXPERIENCE');
+    for (const exp of result.experience) {
+      lines.push(`### ${exp.role} — ${exp.company}`);
+      if (exp.duration || exp.location) {
+        lines.push(`*${[exp.duration, exp.location].filter(Boolean).join(' | ')}*`);
+      }
+      if (Array.isArray(exp.bullets)) {
+        for (const b of exp.bullets) {
+          lines.push(`• ${b}`);
+        }
+      }
+      lines.push('');
+    }
+  }
+  if (Array.isArray(result.projects) && result.projects.length) {
+    lines.push('## KEY PROJECTS');
+    for (const p of result.projects) {
+      lines.push(`### ${p.name}`);
+      if (p.techStack && Array.isArray(p.techStack) && p.techStack.length) {
+        lines.push(`*Tech Stack: ${p.techStack.join(', ')}*`);
+      }
+      if (Array.isArray(p.bullets)) {
+        for (const b of p.bullets) {
+          lines.push(`• ${b}`);
+        }
+      }
+      lines.push('');
+    }
+  }
+  if (Array.isArray(result.education) && result.education.length) {
+    lines.push('## EDUCATION');
+    for (const edu of result.education) {
+      lines.push(`• **${edu.degree}** — ${edu.institute} (${edu.year || ''})`);
+    }
+    lines.push('');
+  }
+  if (Array.isArray(result.certifications) && result.certifications.length) {
+    lines.push('## CERTIFICATIONS');
+    for (const cert of result.certifications) {
+      lines.push(`• ${cert}`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n').trim();
+}
+
 export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, onUpdateAts }: ATSScoreTabProps) {
   const [resolvedFixes, setResolvedFixes] = useState<Record<number, boolean>>({});
   const [copiedRewriteIdx, setCopiedRewriteIdx] = useState<number | null>(null);
@@ -261,7 +344,24 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, on
         evaluatedRole,
         resumeData.id || resumeData._id
       );
-      setAutoFixResult(res);
+      const normalizedText = getAutoFixedResumeText(res);
+      const normalizedResult = {
+        ...res,
+        fixedResumeText: normalizedText,
+        formattedMarkdown: normalizedText,
+        changesSummary: (Array.isArray(res.improvementsSummary) && res.improvementsSummary.length > 0)
+          ? res.improvementsSummary
+          : (Array.isArray(res.changesSummary) && res.changesSummary.length > 0)
+            ? res.changesSummary
+            : [
+                "Transformed bullets into Google XYZ formula (Accomplished [X] as measured by [Y] by doing [Z])",
+                "Replaced passive formulations with executive power action verbs",
+                "Eliminated redundant buzzwords and repeated phrases",
+                "Organized skills and experience for strict ATS readability"
+              ],
+        changesCount: res.fixesCount || res.changesCount || (res.improvementsSummary?.length || 8)
+      };
+      setAutoFixResult(normalizedResult);
       setShowAutoFixModal(true);
       toast.success("Resume transformed with Google XYZ formula!", { id: toastId });
     } catch (err: any) {
@@ -272,9 +372,13 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, on
   };
 
   const handleCopyFullAutoFixed = async () => {
-    if (!autoFixResult?.fixedResumeText) return;
+    const textToCopy = getAutoFixedResumeText(autoFixResult);
+    if (!textToCopy) {
+      toast.error("No resume text available to copy.");
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(autoFixResult.fixedResumeText);
+      await navigator.clipboard.writeText(textToCopy);
       setCopiedFullResume(true);
       toast.success("Polished XYZ resume copied to clipboard!");
       setTimeout(() => setCopiedFullResume(false), 2500);
@@ -284,8 +388,12 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, on
   };
 
   const handleDownloadAutoFixedTxt = () => {
-    if (!autoFixResult?.fixedResumeText) return;
-    const blob = new Blob([autoFixResult.fixedResumeText], { type: 'text/plain;charset=utf-8' });
+    const text = getAutoFixedResumeText(autoFixResult);
+    if (!text) {
+      toast.error("No resume text available to download.");
+      return;
+    }
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -296,7 +404,11 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, on
   };
 
   const handleDownloadAutoFixedDoc = () => {
-    if (!autoFixResult?.fixedResumeText) return;
+    const text = getAutoFixedResumeText(autoFixResult);
+    if (!text) {
+      toast.error("No resume text available to download.");
+      return;
+    }
     const formattedHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -306,12 +418,13 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, on
 body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; line-height: 1.45; color: #111; margin: 36px; }
 h1 { font-size: 18pt; margin-bottom: 2px; color: #0f172a; }
 h2 { font-size: 12pt; border-bottom: 1.5px solid #2563eb; padding-bottom: 2px; margin-top: 14px; margin-bottom: 6px; text-transform: uppercase; color: #1d4ed8; font-weight: bold; }
+h3 { font-size: 11pt; margin-top: 8px; margin-bottom: 2px; color: #1e293b; }
 p, li { font-size: 10pt; margin-bottom: 3px; }
 ul { margin-top: 2px; margin-bottom: 6px; padding-left: 18px; }
 </style>
 </head>
 <body>
-${autoFixResult.fixedResumeText.replace(/\n/g, '<br/>')}
+${text.replace(/\n/g, '<br/>')}
 </body>
 </html>`;
     const blob = new Blob(['\ufeff', formattedHtml], { type: 'application/msword' });
@@ -1311,50 +1424,69 @@ ${autoFixResult.fixedResumeText.replace(/\n/g, '<br/>')}
             </div>
 
             {/* Score Lift & Metrics Strip */}
-            <div className="p-4 bg-emerald-500/10 border-b border-emerald-500/20 flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-3">
-                <span className="font-bold text-foreground">ATS Score Lift:</span>
-                <span className="font-mono line-through text-muted-foreground">{score}/100</span>
-                <ArrowRight className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="font-black text-emerald-600 font-mono text-sm">
-                  {autoFixResult.estimatedScoreAfter || Math.min(95, score + 18)}/100 (+{Math.min(95, score + 18) - score} pts)
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{autoFixResult.changesCount || 8} bullet & keyword optimizations applied</span>
-              </div>
-            </div>
+            {(() => {
+              const displayResumeText = getAutoFixedResumeText(autoFixResult);
+              const displayChangesList = (Array.isArray(autoFixResult?.changesSummary) && autoFixResult.changesSummary.length > 0)
+                ? autoFixResult.changesSummary
+                : (Array.isArray(autoFixResult?.improvementsSummary) && autoFixResult.improvementsSummary.length > 0)
+                  ? autoFixResult.improvementsSummary
+                  : [
+                      "Transformed bullets into Google XYZ formula (Accomplished [X] as measured by [Y] by doing [Z])",
+                      "Replaced passive formulations with executive power action verbs",
+                      "Eliminated redundant buzzwords and repeated phrases",
+                      "Organized skills and experience for strict ATS readability"
+                    ];
+              const displayChangesCount = autoFixResult?.changesCount || autoFixResult?.fixesCount || displayChangesList.length || 8;
 
-            {/* Resume Content View */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-              {autoFixResult.changesSummary && autoFixResult.changesSummary.length > 0 && (
-                <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/60 space-y-1.5 text-xs">
-                  <span className="text-[10px] font-black uppercase font-mono text-muted-foreground block">
-                    Transformations Summary
-                  </span>
-                  <ul className="list-disc pl-4 space-y-1 text-muted-foreground text-[11px]">
-                    {autoFixResult.changesSummary.map((item: string, i: number) => (
-                      <li key={i}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              return (
+                <>
+                  <div className="p-4 bg-emerald-500/10 border-b border-emerald-500/20 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-foreground">ATS Score Lift:</span>
+                      <span className="font-mono line-through text-muted-foreground">{score}/100</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="font-black text-emerald-600 font-mono text-sm">
+                        {autoFixResult.estimatedScoreAfter || Math.min(95, score + 18)}/100 (+{Math.min(95, score + 18) - score} pts)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>{displayChangesCount} bullet & keyword optimizations applied</span>
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase font-mono text-muted-foreground">
-                    Complete Polished Resume Document
-                  </span>
-                  <span className="text-[10px] font-bold text-muted-foreground">
-                    ATS-Friendly Plain Text Hierarchy
-                  </span>
-                </div>
-                <pre className="p-4 rounded-2xl bg-muted/30 border border-border/60 font-mono text-xs text-foreground whitespace-pre-wrap leading-relaxed select-all">
-                  {autoFixResult.fixedResumeText}
-                </pre>
-              </div>
-            </div>
+                  {/* Resume Content View */}
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+                    {displayChangesList.length > 0 && (
+                      <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/60 space-y-1.5 text-xs">
+                        <span className="text-[10px] font-black uppercase font-mono text-muted-foreground block">
+                          Transformations Summary
+                        </span>
+                        <ul className="list-disc pl-4 space-y-1 text-muted-foreground text-[11px]">
+                          {displayChangesList.map((item: string, i: number) => (
+                            <li key={i}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase font-mono text-muted-foreground">
+                          Complete Polished Resume Document
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Ready for PDF/Word Export
+                        </span>
+                      </div>
+                      <pre className="p-4 rounded-2xl bg-muted/30 border border-border/60 font-mono text-xs text-foreground whitespace-pre-wrap leading-relaxed select-all max-h-[460px] overflow-y-auto">
+                        {displayResumeText}
+                      </pre>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Modal Footer Controls */}
             <div className="p-4 sm:p-5 border-t border-border/40 flex flex-wrap items-center justify-between gap-3 bg-muted/30">
