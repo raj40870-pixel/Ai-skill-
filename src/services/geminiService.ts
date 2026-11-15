@@ -47,7 +47,6 @@ export interface ATSResult {
     weak_phrases_found?: string[];
   };
   suggested_roles?: Array<{ role: string; match_percent: number; reason: string; missing_skills: string[] }>;
-  auto_fixed_resume?: any;
   telemetry?: {
     wordCount: number;
     estimatedPages: number;
@@ -199,20 +198,6 @@ export const geminiService = {
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || "Guest scan failed");
-    }
-    return res.json();
-  },
-
-  async autoFixResume(text: string, targetRole: string = "Software Engineer", resumeId?: string): Promise<any> {
-    const model = getActiveAIModel();
-    const res = await fetch(`${BASE_URL}/api/resume/auto-fix`, {
-      method: 'POST',
-      headers: mongoApi.getHeaders(),
-      body: JSON.stringify({ text, targetRole, model, resumeId })
-    });
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || "Failed to auto-fix resume");
     }
     return res.json();
   },
