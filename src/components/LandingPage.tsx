@@ -225,7 +225,7 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
           sessionStorage.setItem('pending_guest_resume', JSON.stringify(cachedPayload));
         } catch {}
       }
-      toast.info("Create your free account to unlock your complete roadmap, interview prep, and download your auto-fixed resume!");
+      toast.info("Create your free account to unlock your complete roadmap, interview prep, and salary benchmarks!");
       onStart();
       return;
     }
@@ -564,7 +564,7 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
                       Locked Features in Free Preview:
                     </p>
                     <div className="grid grid-cols-2 gap-1.5 text-muted-foreground">
-                      <span className="flex items-center gap-1">🔒 1-Click Auto-Fix Resume Download</span>
+                      <span className="flex items-center gap-1">🔒 Full 8-Factor ATS Breakdown</span>
                       <span className="flex items-center gap-1">🔒 30-60-90 Day Skill Roadmap</span>
                       <span className="flex items-center gap-1">🔒 STAR Method Interview Prep</span>
                       <span className="flex items-center gap-1">🔒 Real Salary Benchmarks</span>
@@ -579,7 +579,7 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
                     <Sparkles className="w-4 h-4 text-yellow-300 fill-current" />
                     {user && user.uid && user.email !== 'guest@careernav.ai'
                       ? "Open Full Dashboard & Roadmap"
-                      : "Create Free Account to Unlock All & Download Auto-Fixed Resume"}
+                      : "Create Free Account to Unlock Complete Career Suite & Roadmap"}
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </div>
