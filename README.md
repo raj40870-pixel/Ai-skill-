@@ -1,6 +1,6 @@
 # 🚀 Career Navigation AI — Frontend Client & Web Platform
 
-[![Ideathon Winner](https://img.shields.io/badge/Ideathon-2nd%20Prize%20Winner%20🥈-FFD700?style=for-the-badge&logo=target&logoColor=black)](https://carrer-nav-ai.vercel.app)
+[![Ideathon 1st Runner-Up](https://img.shields.io/badge/Ideathon-1st%20Runner--Up%20🥈%20(Second%20Prize)-FFD700?style=for-the-badge&logo=target&logoColor=black)](https://carrer-nav-ai.vercel.app)
 [![Team The Hustlers](https://img.shields.io/badge/Team-The%20Hustlers-FF5722?style=for-the-badge&logo=shield)](https://github.com/raj40870-pixel/Ai-skill-)
 [![Live Application](https://img.shields.io/badge/Live-carrer--nav--ai.vercel.app-blue?style=for-the-badge&logo=vercel)](https://carrer-nav-ai.vercel.app)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
@@ -13,7 +13,8 @@
 
 ## 🏆 Award & Ideathon Recognition
 
-### 🥈 **Second Prize Winner — Next Gen Web Impact Challenge Ideathon**
+### 🥈 **1st Runner-Up (Second Prize) — Next Gen Web Impact Challenge Ideathon**
+* **Rank / Standing:** **1st Runner-Up** (2nd Place Overall)
 * **Event:** Next Gen Web Impact Challenge Ideathon (November 2026)
 * **Organized by:** Brain Storm Project Club • Lovely Professional University (LPU)
 * **Awarded to:** **Team The Hustlers**
@@ -24,8 +25,8 @@
 * **Pitch Deck:** [Presentation Deck (.pptx)](public/The_Hustlers_Career_Nav_AI_Presentation.pptx)
 
 <div align="center">
-  <img src="assets/ideathon_second_prize_trophy.jpg" alt="Next Gen Web Impact Challenge Ideathon - Second Prize Trophy" width="380" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" />
-  <p><em>🏆 Team The Hustlers (Kamaljit & Mantaj) awarded 2nd Prize at Lovely Professional University</em></p>
+  <img src="assets/ideathon_second_prize_trophy.jpg" alt="Next Gen Web Impact Challenge Ideathon - 1st Runner Up Trophy" width="380" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" />
+  <p><em>🏆 Team The Hustlers (Kamaljit & Mantaj) awarded 1st Runner-Up Trophy at Lovely Professional University</em></p>
 </div>
 
 ---
