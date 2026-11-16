@@ -89,7 +89,74 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
     "Generating instant diagnostic preview..."
   ];
 
-  const prepareFilePayload = (file: File): Promise<{ base64: string; mimeType: string }> => {
+  const prepareFilePayload = async (file: File): Promise<{ base64: string; mimeType: string }> => {
+    const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|bmp|heic|heif)$/i.test(file.name);
+    
+    if (isImage) {
+      return new Promise((resolve) => {
+        try {
+          const img = new Image();
+          const url = URL.createObjectURL(file);
+          img.onload = () => {
+            try {
+              URL.revokeObjectURL(url);
+              let width = img.width;
+              let height = img.height;
+              const maxDim = 1800;
+              if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                  height = Math.round((height * maxDim) / width);
+                  width = maxDim;
+                } else {
+                  width = Math.round((width * maxDim) / height);
+                  height = maxDim;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0, width, height);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+                const base64 = dataUrl.split(',')[1];
+                resolve({ base64, mimeType: 'image/jpeg' });
+                return;
+              }
+            } catch (canvasErr) {
+              console.warn("Canvas optimization fallback:", canvasErr);
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+              const base64 = (reader.result as string).split(',')[1];
+              resolve({ base64, mimeType: 'image/jpeg' });
+            };
+            reader.onerror = () => resolve({ base64: '', mimeType: 'image/jpeg' });
+            reader.readAsDataURL(file);
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(url);
+            const reader = new FileReader();
+            reader.onload = () => {
+              const base64 = (reader.result as string).split(',')[1];
+              resolve({ base64, mimeType: 'image/jpeg' });
+            };
+            reader.onerror = () => resolve({ base64: '', mimeType: 'image/jpeg' });
+            reader.readAsDataURL(file);
+          };
+          img.src = url;
+        } catch {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = (reader.result as string).split(',')[1];
+            resolve({ base64, mimeType: 'image/jpeg' });
+          };
+          reader.onerror = () => resolve({ base64: '', mimeType: 'image/jpeg' });
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
@@ -152,9 +219,18 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
       clearInterval(stepInterval);
 
       const resumeText = guestData.text || "";
+      const pendingData = {
+        text: resumeText,
+        filename: file.name,
+        detectedRole: guestData.detectedRole || "Software Engineer",
+        suggested_roles: guestData.suggestedTargetRoles || [],
+        universalScore: guestData.universal_score || 71
+      };
+
       setCachedPayload({ text: resumeText, filename: file.name });
       try {
-        sessionStorage.setItem('pending_guest_resume', JSON.stringify({ text: resumeText, filename: file.name }));
+        sessionStorage.setItem('pending_guest_resume', JSON.stringify(pendingData));
+        localStorage.setItem('careernav_guest_pending_resume', JSON.stringify(pendingData));
       } catch {}
 
       const universalScore = guestData.universal_score || 71;
@@ -167,14 +243,14 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
         keywordScore: universalScore >= 75 ? 82 : 68,
         impactScore: guestData.telemetry?.quantifiedPercent || 40,
         missingKeywords: guestData.topIssues?.map((i: any) => i.title).slice(0, 4) || ['System Metrics', 'Google XYZ Format'],
-        detectedRole: guestData.detectedRole || "Professional",
+        detectedRole: guestData.detectedRole || "Software Engineer",
         suggestedTargetRoles: guestData.suggestedTargetRoles || [],
         topIssues: guestData.topIssues || [],
         sampleRewrite: guestData.sampleRewrite || null,
         filename: file.name,
         isGuest: true
       });
-      toast.success("Resume scanned! Verified 71 baseline score & 4 target roles ready.");
+      toast.success("Resume scanned! Verified baseline score & 4 target roles ready.");
     } catch (err: any) {
       clearInterval(stepInterval);
       console.error("Instant scan error:", err);
@@ -185,24 +261,37 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
   };
 
   const handleSampleResume = () => {
-    if (!user || !user.uid || user.email === 'guest@careernav.ai') {
-      toast.info("Please sign up or log in first to test sample resume analysis.");
-      onStart();
-      return;
-    }
-
     setIsScanning(true);
     setScanStepIndex(0);
     setScanResult(null);
 
     const stepInterval = setInterval(() => {
       setScanStepIndex((prev) => (prev + 1) % scanSteps.length);
-    }, 600);
+    }, 500);
 
     setTimeout(() => {
       clearInterval(stepInterval);
       setIsScanning(false);
+
+      const samplePayload = {
+        text: SAMPLE_RESUME_TEXT,
+        filename: "Alex_Morgan_Senior_Engineer_Resume.pdf",
+        detectedRole: "Senior Software Engineer",
+        suggested_roles: [
+          { role: "Senior Full Stack Engineer", matchPercent: 92, reason: "React, Node.js & cloud infrastructure" },
+          { role: "Staff Software Engineer", matchPercent: 86, reason: "Distributed systems & scalable architecture" },
+          { role: "Cloud Solutions Architect", matchPercent: 80, reason: "Kubernetes, Docker & AWS deployments" },
+          { role: "DevOps / Platform Engineer", matchPercent: 74, reason: "CI/CD automation & observability" }
+        ],
+        universalScore: 84
+      };
+
       setCachedPayload({ text: SAMPLE_RESUME_TEXT, filename: "Alex_Morgan_Senior_Engineer_Resume.pdf" });
+      try {
+        sessionStorage.setItem('pending_guest_resume', JSON.stringify(samplePayload));
+        localStorage.setItem('careernav_guest_pending_resume', JSON.stringify(samplePayload));
+      } catch {}
+
       setScanResult({
         score: 84,
         grade: 'A',
@@ -210,22 +299,41 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
         formatScore: 96,
         keywordScore: 88,
         impactScore: 82,
-        missingKeywords: ['Kubernetes', 'GraphQL Federation', 'Distributed Tracing'],
-        filename: "Alex_Morgan_Senior_Engineer_Resume.pdf"
+        missingKeywords: ['OpenTelemetry', 'GraphQL Federation', 'Distributed Tracing'],
+        detectedRole: "Senior Software Engineer",
+        suggestedTargetRoles: samplePayload.suggested_roles,
+        topIssues: [
+          { title: "Observability Metrics", impact: "Missing distributed tracing tools", recommendation: "Add Jaeger / OpenTelemetry monitoring to project bullet points." },
+          { title: "Bullet Point Scaling", impact: "82% quantified bullets", recommendation: "Incorporate p99 latency reduction numbers (e.g. cut latency by 35%)." }
+        ],
+        sampleRewrite: {
+          before: "Maintained backend services and fixed bugs to improve performance.",
+          after: "Architected resilient distributed Node.js microservices, slashing p99 latency by 42% across 2.5M daily active API requests."
+        },
+        filename: "Alex_Morgan_Senior_Engineer_Resume.pdf",
+        isGuest: true
       });
-      toast.success("Loaded sample engineering resume!");
-    }, 1800);
+      toast.success("Loaded sample engineering resume! Free ATS preview ready.");
+    }, 1200);
   };
 
   const handleUnlockFullAudit = () => {
-    // If guest, save the resume in session storage and open sign in/register modal
+    // If guest, save the resume in session and local storage and open sign in/register modal
     if (!user || !user.uid || user.email === 'guest@careernav.ai') {
       if (cachedPayload) {
         try {
-          sessionStorage.setItem('pending_guest_resume', JSON.stringify(cachedPayload));
+          const payload = {
+            text: cachedPayload.text,
+            filename: cachedPayload.filename,
+            suggested_roles: scanResult?.suggestedTargetRoles || [],
+            detectedRole: scanResult?.detectedRole || "Software Engineer",
+            universalScore: scanResult?.score || 71
+          };
+          sessionStorage.setItem('pending_guest_resume', JSON.stringify(payload));
+          localStorage.setItem('careernav_guest_pending_resume', JSON.stringify(payload));
         } catch {}
       }
-      toast.info("Create your free account to unlock your complete roadmap, interview prep, and salary benchmarks!");
+      toast.info("Create your free account to unlock your complete roadmap, interview prep, and salary benchmarks — no file re-upload needed!");
       onStart();
       return;
     }
@@ -234,7 +342,9 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
       onUploadSuccess({
         text: cachedPayload.text,
         filename: cachedPayload.filename,
-        userId: user.uid
+        userId: user.uid,
+        detectedRole: scanResult?.detectedRole,
+        suggestedTargetRoles: scanResult?.suggestedTargetRoles
       });
     } else {
       onStart();
@@ -572,16 +682,23 @@ export function LandingPage({ onStart, user, onGoToDashboard, hideNavbar = false
                   </div>
 
                   {/* Main CTA */}
-                  <Button 
-                    onClick={handleUnlockFullAudit}
-                    className="w-full h-12 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-primary/25 cursor-pointer flex items-center justify-center gap-2 group"
-                  >
-                    <Sparkles className="w-4 h-4 text-yellow-300 fill-current" />
-                    {user && user.uid && user.email !== 'guest@careernav.ai'
-                      ? "Open Full Dashboard & Roadmap"
-                      : "Create Free Account to Unlock Complete Career Suite & Roadmap"}
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </Button>
+                  <div className="space-y-2">
+                    <Button 
+                      onClick={handleUnlockFullAudit}
+                      className="w-full h-12 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-primary/25 cursor-pointer flex items-center justify-center gap-2 group"
+                    >
+                      <Sparkles className="w-4 h-4 text-yellow-300 fill-current" />
+                      {user && user.uid && user.email !== 'guest@careernav.ai'
+                        ? "Open Full Dashboard & Roadmap"
+                        : "Create Free Account to Unlock Full Career Suite"}
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                    {(!user || !user.uid || user.email === 'guest@careernav.ai') && (
+                      <p className="text-[10px] text-center text-muted-foreground">
+                        ✨ Zero re-upload needed — your scanned resume will automatically open in your new dashboard!
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 

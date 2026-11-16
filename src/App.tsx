@@ -244,6 +244,33 @@ export default function App() {
         })
         .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
+      // 1. If user just scanned a resume as a guest (on Landing Page), prioritize importing it immediately
+      const pendingGuestStr = sessionStorage.getItem('pending_guest_resume') || localStorage.getItem('careernav_guest_pending_resume');
+      if (pendingGuestStr) {
+        try {
+          const pendingGuest = JSON.parse(pendingGuestStr);
+          sessionStorage.removeItem('pending_guest_resume');
+          localStorage.removeItem('careernav_guest_pending_resume');
+          if (pendingGuest && pendingGuest.text && pendingGuest.text.trim().length > 20) {
+            toast.info("Importing your scanned resume into your account...");
+            await handleUploadSuccess({
+              text: pendingGuest.text,
+              filename: pendingGuest.filename || 'Scanned_Resume.pdf',
+              userId: uid,
+              detectedRole: pendingGuest.detectedRole || pendingGuest.suggested_roles?.[0]?.role || "Software Engineer",
+              suggestedTargetRoles: Array.isArray(pendingGuest.suggested_roles) ? pendingGuest.suggested_roles.map((r: any) => ({
+                role: r.role || "Software Engineer",
+                matchPercent: r.matchPercent || r.match_percent || 80,
+                reason: r.reason || "High transferability"
+              })) : undefined
+            });
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to parse pending guest resume", e);
+        }
+      }
+
       if (validResumesList.length > 0) {
         // Retrieve the saved active resume ID for this user from localStorage
         const savedActiveId = localStorage.getItem(`careernav_active_resume_id_${uid}`);
@@ -276,30 +303,6 @@ export default function App() {
         setIsOnboardingPromptingTarget(true);
         setAppState('dashboard');
       } else {
-        const pendingGuestStr = sessionStorage.getItem('pending_guest_resume');
-        if (pendingGuestStr) {
-          try {
-            const pendingGuest = JSON.parse(pendingGuestStr);
-            sessionStorage.removeItem('pending_guest_resume');
-            if (pendingGuest && pendingGuest.text) {
-              toast.info("Importing your scanned resume into your account...");
-              await handleUploadSuccess({
-                text: pendingGuest.text,
-                filename: pendingGuest.filename || 'Scanned_Resume.pdf',
-                userId: uid,
-                detectedRole: pendingGuest.suggested_roles?.[0]?.role,
-                suggestedTargetRoles: pendingGuest.suggested_roles?.map((r: any) => ({
-                  role: r.role,
-                  matchPercent: r.match_percent,
-                  reason: r.reason
-                }))
-              });
-              return;
-            }
-          } catch (e) {
-            console.error("Failed to parse pending guest resume", e);
-          }
-        }
         setResumeData(null);
         setActiveResumeId(null);
         setAtsData(null);
@@ -388,12 +391,7 @@ export default function App() {
       return;
     }
 
-    const detectedTarget = (data.detectedRole || '').trim() || data.suggestedTargetRoles?.[0]?.role?.trim() || '';
-    if (!detectedTarget) {
-      toast.error("AI could not verify your target role from the resume. Please upload again.");
-      setIsProcessing(false);
-      return;
-    }
+    const detectedTarget = (data.detectedRole || '').trim() || data.suggestedTargetRoles?.[0]?.role?.trim() || 'Software Engineer';
 
     const extractedSkills: string[] = Array.isArray(data.parsedData?.skills) ? data.parsedData.skills : [];
     const structuredData = data.parsedData || {
