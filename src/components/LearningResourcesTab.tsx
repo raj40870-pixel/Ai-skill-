@@ -52,9 +52,17 @@ export function LearningResourcesTab({ roadmap, onNavigate }: LearningResourcesT
   const [data, setData] = useState<LearningResourcesData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string>('all');
 
-  const targetRole = roadmap?.title?.replace("Learning Roadmap for ", "") || "your role";
-  const skills = roadmap?.skills || [];
+  const targetRole = (roadmap?.title || "")
+    .replace(/^30-60-90 Day Career Roadmap for\s*/i, "")
+    .replace(/^Learning Roadmap for\s*/i, "")
+    .trim() || "Target Role";
+
+  const skills = roadmap?.skill_gap_report?.matched_skills || 
+                 (roadmap?.skill_gap_report?.verified_strengths || []).map((s: any) => s.skill || s) || 
+                 roadmap?.skills || [];
+                 
   const skillGaps = roadmap?.skill_gap_report?.missing_skills || [];
 
   const fetchResources = async () => {
@@ -266,7 +274,7 @@ export function LearningResourcesTab({ roadmap, onNavigate }: LearningResourcesT
             <div className="space-y-3">
               <h3 className="text-2xl font-black text-foreground">Conducting Deep Intelligence Sweep...</h3>
               <p className="text-sm text-muted-foreground font-medium max-w-md mx-auto italic">
-                Analyzing your profile against 2024-2025 industry standards to find specific, working documentation and repositories.
+                Analyzing your profile against 2026 enterprise engineering standards to find direct, verified documentation, courses, and repositories.
               </p>
             </div>
             
@@ -321,17 +329,45 @@ export function LearningResourcesTab({ roadmap, onNavigate }: LearningResourcesT
               </div>
             </Card>
 
+            {/* RESOURCE TYPE FILTER PILLS */}
+            <div className="flex flex-wrap items-center justify-center gap-2 p-2 bg-muted/30 dark:bg-zinc-900/40 rounded-2xl max-w-2xl mx-auto border border-border/40">
+              {[
+                { id: 'all', label: 'All Resources' },
+                { id: 'course', label: 'Courses & Certs' },
+                { id: 'documentation', label: 'Official Docs' },
+                { id: 'github', label: 'GitHub Repos' },
+                { id: 'tutorial', label: 'Tutorials & Labs' }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setSelectedType(f.id)}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                    selectedType === f.id
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
             {/* LIVE RESOURCE GRID */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              {data.categories.map((category, catIdx) => (
-                <div key={catIdx} className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-2 h-8 rounded-full bg-primary shadow-lg shadow-primary/20" />
-                    <h3 className="text-2xl font-black text-foreground tracking-tight">{category.name}</h3>
-                  </div>
+              {data.categories.map((category, catIdx) => {
+                const categoryFiltered = category.resources.filter((r: any) => selectedType === 'all' || r.type === selectedType);
+                if (categoryFiltered.length === 0) return null;
 
-                  <div className="grid grid-cols-1 gap-5">
-                    {category.resources.map((resource, resIdx) => (
+                return (
+                  <div key={catIdx} className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-2 h-8 rounded-full bg-primary shadow-lg shadow-primary/20" />
+                      <h3 className="text-2xl font-black text-foreground tracking-tight">{category.name}</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-5">
+                      {categoryFiltered.map((resource, resIdx) => (
                       <motion.div
                         key={resIdx}
                         initial={{ opacity: 0, x: -10 }}
@@ -395,9 +431,10 @@ export function LearningResourcesTab({ roadmap, onNavigate }: LearningResourcesT
                         </Card>
                       </motion.div>
                     ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </motion.div>
         ) : (

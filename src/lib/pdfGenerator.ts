@@ -1234,7 +1234,7 @@ export function generateLearningResourcesPdf(data: PdfReportData) {
   const rawResources = data.roadmap?.learning_resources || [];
 
   rawResources.forEach((cat: any) => {
-    const topic = cat.category || cat.skill_or_topic || "Engineering Topic";
+    const topic = cat.name || cat.category || cat.skill_or_topic || "Engineering Topic";
     if (cat.resources && Array.isArray(cat.resources)) {
       cat.resources.forEach((r: any) => {
         list.push({
