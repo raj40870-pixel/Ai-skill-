@@ -53,9 +53,9 @@ export function Header({ activeTab, onTabChange, onLogout, user }: HeaderProps) 
     { id: 'interview', label: 'Interview Preparation', icon: MessageSquare },
     { id: 'mentorship', label: 'AI Mentorship', icon: Sparkles },
     { id: 'history', label: 'History', icon: History },
-    { id: 'profile', label: 'Profile', icon: User },
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'support', label: 'Help Desk', icon: LifeBuoy },
+    { id: 'profile', label: 'Profile', icon: User },
     { id: 'logout', label: 'Logout', icon: LogOut },
   ];
 
@@ -156,9 +156,13 @@ export function Header({ activeTab, onTabChange, onLogout, user }: HeaderProps) 
               </button>
             )}
 
-            {/* User Display (Desktop) */}
+            {/* User Display (Desktop) - Clicking opens Profile */}
             {user && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-zinc-800/60 rounded-xl border border-gray-100 dark:border-zinc-700/60 max-w-[200px]">
+              <button
+                onClick={() => handleNavClick('profile')}
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 rounded-xl border border-gray-100 dark:border-zinc-700/60 max-w-[200px] transition-all cursor-pointer text-left"
+                title="View & Edit Profile"
+              >
                 <div className="w-6 h-6 rounded-full overflow-hidden bg-blue-100 shrink-0 shadow-inner">
                   <img 
                     src={getUserAvatar(user.email, user.displayName, user.photoURL)} 
@@ -172,17 +176,17 @@ export function Header({ activeTab, onTabChange, onLogout, user }: HeaderProps) 
                     {getUserCleanName(user)}
                   </span>
                   {isAdmin && (
-                    <button
-                      onClick={() => handleNavClick('admin')}
+                    <span
+                      onClick={(e) => { e.stopPropagation(); handleNavClick('admin'); }}
                       className="text-[8px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest flex items-center gap-0.5 hover:underline cursor-pointer"
                       title="Click to open Admin Panel"
                     >
                       <Zap className="w-2 h-2 fill-current" />
                       Admin Console
-                    </button>
+                    </span>
                   )}
                 </div>
-              </div>
+              </button>
             )}
 
             {/* Sign Out Button */}
@@ -286,7 +290,11 @@ export function Header({ activeTab, onTabChange, onLogout, user }: HeaderProps) 
               {/* User Identity inside drawer */}
               {user && (
                 <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col gap-3">
-                  <div className="flex items-center gap-3">
+                  <div 
+                    onClick={() => handleNavClick('profile')}
+                    className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                    title="Open Profile"
+                  >
                     <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 shadow-sm">
                       <img 
                         src={getUserAvatar(user.email, user.displayName, user.photoURL)} 

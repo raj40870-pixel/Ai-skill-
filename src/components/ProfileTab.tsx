@@ -53,8 +53,8 @@ export function ProfileTab({ user, resumeData, onUserUpdate }: ProfileTabProps) 
 
   // Preferences State
   const [preferences, setPreferences] = useState({
-    fullname: user?.displayName || 'Raj kumar',
-    targetRole: 'Senior Full Stack Engineer',
+    fullname: user?.displayName || (user?.email ? user.email.split('@')[0] : 'Kamaljit'),
+    targetRole: resumeData?.targetRole || 'Senior Full Stack Engineer',
     careerStatus: 'Working',
     experienceYears: '4',
     preferredWorkStyle: 'Remote',
