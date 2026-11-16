@@ -279,13 +279,71 @@ export function CareerRoadmapTab({
 
                 {/* Sprint Content */}
                 <div className="flex-1 space-y-6">
-                  <div className="glass p-6 rounded-[2rem] border border-border bg-card/80 shadow-md">
-                    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-primary block mb-1">
-                      SPRINT MILESTONE {sIdx + 1}
-                    </span>
+                  <div className="glass p-6 md:p-7 rounded-[2rem] border border-border bg-card/80 shadow-md space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-[0.25em] text-primary">
+                          SPRINT {sprint.sprint_number || sIdx + 1}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-extrabold">
+                          {sprint.phase || (sIdx < 2 ? "Phase 1: Days 1-30" : sIdx < 4 ? "Phase 2: Days 31-60" : "Phase 3: Days 61-90")}
+                        </span>
+                      </div>
+                    </div>
+
                     <h3 className="text-lg md:text-xl font-black tracking-tight text-foreground">
                       {sprint.theme}
                     </h3>
+
+                    {/* Milestone Goal & Practical Project Callouts */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
+                      {sprint.milestone_goal && (
+                        <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/60 space-y-1">
+                          <span className="font-black text-[10px] uppercase text-primary flex items-center gap-1.5">
+                            <Target className="w-3.5 h-3.5" />
+                            Milestone Goal
+                          </span>
+                          <p className="text-muted-foreground leading-relaxed">
+                            {sprint.milestone_goal}
+                          </p>
+                        </div>
+                      )}
+
+                      {sprint.practical_project && (
+                        <div className="p-3.5 rounded-2xl bg-blue-500/5 border border-blue-500/20 space-y-1">
+                          <span className="font-black text-[10px] uppercase text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                            <Code className="w-3.5 h-3.5" />
+                            Hands-on Production Deliverable
+                          </span>
+                          <p className="text-foreground/90 font-medium leading-relaxed">
+                            {sprint.practical_project}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Recommended Certification Banner */}
+                    {sprint.certification_focus && (
+                      <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2">
+                          <Award className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span className="font-bold text-foreground">
+                            Target Certification: <strong className="text-emerald-600 dark:text-emerald-400">{sprint.certification_focus.name || sprint.certification_focus}</strong>
+                            {sprint.certification_focus.issuer && ` (${sprint.certification_focus.issuer})`}
+                          </span>
+                        </div>
+                        {sprint.certification_focus.url && (
+                          <a 
+                            href={sprint.certification_focus.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold shrink-0 hover:bg-emerald-700 transition-all"
+                          >
+                            Explore Exam
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
@@ -327,8 +385,8 @@ export function CareerRoadmapTab({
                                     <div className="flex items-center gap-2 flex-wrap mb-1">
                                       <span className={cn(
                                         "text-[9px] font-black uppercase px-2 py-0.5 rounded-md",
-                                        task.type === 'course' ? "bg-blue-500/10 text-blue-600 border border-blue-500/20" :
-                                        task.type === 'project' ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" :
+                                        (task.type === 'course' || task.type === 'cert') ? "bg-blue-500/10 text-blue-600 border border-blue-500/20" :
+                                        (task.type === 'project' || task.type === 'deliverable') ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" :
                                         "bg-purple-500/10 text-purple-600 border border-purple-500/20"
                                       )}>
                                         {task.type}

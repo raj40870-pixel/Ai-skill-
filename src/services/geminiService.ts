@@ -67,21 +67,43 @@ export interface RoadmapData {
   title: string;
   sprints: {
     sprint_number: number;
+    phase?: string;
     theme: string;
+    milestone_goal?: string;
+    practical_project?: string;
+    certification_focus?: {
+      name: string;
+      issuer: string;
+      exam_code?: string;
+      url?: string;
+    };
     weeks: {
       week: number;
       title: string;
-      tasks: { type: 'course' | 'project' | 'skill'; title: string; platform?: string; hours?: number; tech?: string[]; details?: string }[];
+      tasks: { type: 'course' | 'project' | 'skill' | 'cert' | 'deliverable'; title: string; platform?: string; hours?: number; tech?: string[]; details?: string }[];
     }[];
   }[];
   skill_gap_report?: {
+    verified_strengths?: {
+      skill: string;
+      category: string;
+      proficiency: string;
+      evidence?: string;
+    }[];
+    matched_skills?: string[];
     missing_skills: {
       category: string;
       skill: string;
       priority: 'High' | 'Medium' | 'Low';
+      current_level?: string;
+      target_level?: string;
+      estimated_hours?: number;
+      salary_impact?: string;
       reason: string;
-      market_demand_trend: string;
+      market_demand_trend?: string;
       suggested_improvement: string;
+      certified_resource?: string;
+      certification_name?: string;
     }[];
   };
   learning_resources?: {

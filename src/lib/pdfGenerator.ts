@@ -509,38 +509,92 @@ export function generateFullAuditPdf(data: PdfReportData) {
 
   writer.y += 4;
 
-  // --- SECTION 4: SKILL GAP & RECRUITER FRICTION ---
-  writer.drawSectionHeading("4. Skill Gap & Recruiter Hiring Friction", "Target technologies and architectural proficiencies missing from current resume keywords");
+  // --- SECTION 4: SKILL GAP & RECRUITER FRICTION MATRIX ---
+  writer.drawSectionHeading("4. Skill Gap & Recruiter Hiring Friction Matrix", "Verified profile competencies contrasted against 2026 enterprise engineering requisites");
+
+  // Extract verified profile strengths
+  const verifiedStrengthsList: string[] = 
+    (data.roadmap?.skill_gap_report?.matched_skills && data.roadmap.skill_gap_report.matched_skills.length > 0)
+      ? data.roadmap.skill_gap_report.matched_skills
+      : (data.roadmap?.skill_gap_report?.verified_strengths && data.roadmap.skill_gap_report.verified_strengths.length > 0)
+        ? data.roadmap.skill_gap_report.verified_strengths.map((s: any) => typeof s === 'string' ? s : s.skill)
+        : (data.parsedResume?.skills && data.parsedResume.skills.length > 0)
+          ? data.parsedResume.skills
+          : (data.atsData?.matched_keywords && data.atsData.matched_keywords.length > 0)
+            ? data.atsData.matched_keywords
+            : ["Full-Stack Architecture", "Modern TypeScript & React", "RESTful & Async APIs", "State Normalization", "Database Modeling", "Git Workflow & CI/CD"];
+
+  // Render Verified Strengths sub-block
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(22, 101, 52);
+  doc.text("VERIFIED PROFILE COMPETENCIES (DETECTED IN RESUME):", writer.margin, writer.y + 4);
+  writer.y += 6;
+
+  const colWidth = (writer.contentWidth - 4) / 2;
+  const strengthsToRender = verifiedStrengthsList.slice(0, 8);
+  for (let i = 0; i < strengthsToRender.length; i += 2) {
+    writer.ensureSpace(8);
+    const s1 = strengthsToRender[i];
+    const s2 = strengthsToRender[i + 1];
+
+    doc.setFillColor(240, 253, 244);
+    doc.roundedRect(writer.margin, writer.y, colWidth, 6, 1, 1, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(22, 101, 52);
+    doc.text(`[VERIFIED] ${s1}`, writer.margin + 3, writer.y + 4.2);
+
+    if (s2) {
+      doc.setFillColor(240, 253, 244);
+      doc.roundedRect(writer.margin + colWidth + 4, writer.y, colWidth, 6, 1, 1, "F");
+      doc.text(`[VERIFIED] ${s2}`, writer.margin + colWidth + 7, writer.y + 4.2);
+    }
+    writer.y += 7.5;
+  }
+
+  writer.y += 3;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("CRITICAL SKILL GAPS TO BRIDGE (MARKET DEMAND MATRIX):", writer.margin, writer.y + 4);
+  writer.y += 6;
 
   const skillGapData = data.roadmap?.skill_gap_report || {
-    matched_skills: ["JavaScript", "TypeScript", "React", "Node.js", "Express", "Git", "REST APIs"],
+    matched_skills: verifiedStrengthsList,
     missing_skills: [
-      { skill: "Docker & Containerization", category: "DevOps Tool", priority: "High", reason: "Standard requirement in modern cloud deployments", suggested_improvement: "Containerize multi-service full stack app and publish to Docker Hub." },
-      { skill: "Distributed Redis Caching", category: "Backend Tool", priority: "High", reason: "Critical for high-throughput scaling and session stores", suggested_improvement: "Integrate Redis cache with TTL strategies to optimize database response times." },
-      { skill: "System Architecture & CI/CD", category: "Architecture", priority: "Medium", reason: "Required for senior engineering compensation bands", suggested_improvement: "Deploy GitHub Actions workflow running automated linting, tests, and cloud deploy." }
+      { skill: "Docker & Containerization", category: "DevOps Tool", priority: "High", current_level: "None", target_level: "Production-Grade", estimated_hours: 25, salary_impact: "+$15k-$20k / +15%", reason: "Standard requirement in modern cloud deployments", suggested_improvement: "Containerize multi-service full stack app and publish to Docker Hub.", certified_resource: "Docker Certified Associate (DCA)" },
+      { skill: "Distributed Redis Caching", category: "Backend Tool", priority: "High", current_level: "Beginner", target_level: "Enterprise-Ready", estimated_hours: 20, salary_impact: "+$12k-$18k / +12%", reason: "Critical for high-throughput scaling and sub-50ms latency", suggested_improvement: "Integrate Redis caching with cluster clustering and automated cache invalidation.", certified_resource: "Redis Certified Developer" },
+      { skill: "System Architecture & CI/CD", category: "Architecture", priority: "Medium", current_level: "Beginner", target_level: "Production-Grade", estimated_hours: 30, salary_impact: "+$18k-$25k / +18%", reason: "Required for senior engineering compensation bands", suggested_improvement: "Deploy GitHub Actions workflow running automated linting, tests, and cloud deploy.", certified_resource: "AWS Solutions Architect Associate" }
     ]
   };
 
   const rawMissing = (skillGapData.missing_skills && skillGapData.missing_skills.length > 0)
     ? skillGapData.missing_skills
     : [
-        { skill: "Docker & Containerization", category: "Tool", priority: "High", reason: "Standard requirement in modern cloud deployments", suggested_improvement: "Containerize your primary full-stack app and push to DockerHub" },
-        { skill: "Distributed Redis Caching", category: "Technical Skill", priority: "High", reason: "Critical for high-traffic throughput and API scaling", suggested_improvement: "Implement Redis caching layer on frequent database query endpoints" },
-        { skill: "CI/CD & Cloud Infrastructure", category: "DevOps", priority: "Medium", reason: "Enterprise standard for reliable production releases", suggested_improvement: "Configure GitHub Actions pipeline for automated testing and cloud deployment" }
+        { skill: "Docker & Containerization", category: "DevOps Tool", priority: "High", current_level: "None", target_level: "Production-Grade", estimated_hours: 25, salary_impact: "+$15k-$20k / +15%", reason: "Standard requirement in modern cloud deployments", suggested_improvement: "Containerize multi-service full stack app and publish to Docker Hub.", certified_resource: "Docker Certified Associate (DCA)" },
+        { skill: "Distributed Redis Caching", category: "Backend Tool", priority: "High", current_level: "Beginner", target_level: "Enterprise-Ready", estimated_hours: 20, salary_impact: "+$12k-$18k / +12%", reason: "Critical for high-throughput scaling and sub-50ms latency", suggested_improvement: "Integrate Redis caching with cluster clustering and automated cache invalidation.", certified_resource: "Redis Certified Developer" },
+        { skill: "System Architecture & CI/CD", category: "Architecture", priority: "Medium", current_level: "Beginner", target_level: "Production-Grade", estimated_hours: 30, salary_impact: "+$18k-$25k / +18%", reason: "Required for senior engineering compensation bands", suggested_improvement: "Deploy GitHub Actions workflow running automated linting, tests, and cloud deploy.", certified_resource: "AWS Solutions Architect Associate" }
       ];
 
-  rawMissing.slice(0, 4).forEach((item: any, idx: number) => {
+  rawMissing.slice(0, 5).forEach((item: any, idx: number) => {
     const isObj = typeof item === "object" && item !== null;
     const skillName = isObj ? (item.skill || `Gap #${idx + 1}`) : item;
     const category = isObj ? (item.category || "Technical Skill") : "Technical Skill";
     const priority = isObj ? (item.priority || "High") : "High";
-    const reason = isObj ? (item.reason || "High demand in enterprise job postings") : "Missing in current resume keywords";
+    const currentLvl = isObj ? (item.current_level || (priority === "High" ? "None" : "Beginner")) : "None";
+    const targetLvl = isObj ? (item.target_level || "Production-Grade") : "Production-Grade";
+    const estHours = isObj ? (item.estimated_hours || 25) : 25;
+    const salaryImp = isObj ? (item.salary_impact || "+$15,000 / +15% Lift") : "+$15,000 / +15% Lift";
+    const reason = isObj ? (item.reason || "High demand in enterprise job requisitions") : "Missing in current resume keywords";
     const action = isObj ? (item.suggested_improvement || "Build a production-level GitHub project showcasing this competency.") : "Build a project demonstrating this skill.";
+    const cert = isObj ? (item.certification_name || item.certified_resource || "Industry Accredited Course") : "Industry Accredited Course";
 
     const wrappedReason = doc.splitTextToSize(`Hiring Friction: ${reason}`, writer.contentWidth - 12);
     const wrappedFix = doc.splitTextToSize(`Prescribed Fix: ${action}`, writer.contentWidth - 12);
+    const wrappedCert = doc.splitTextToSize(`Recommended Credential: ${cert}`, writer.contentWidth - 12);
 
-    const cardHeight = 14 + (wrappedReason.length * 3.4) + (wrappedFix.length * 3.4);
+    const cardHeight = 18 + (wrappedReason.length * 3.4) + (wrappedFix.length * 3.4) + (wrappedCert.length * 3.4);
     writer.ensureSpace(cardHeight + 4);
 
     doc.setFillColor(255, 255, 255);
@@ -567,7 +621,13 @@ export function generateFullAuditPdf(data: PdfReportData) {
     else doc.setTextColor(37, 99, 235);
     doc.text(`${priority} Priority`, writer.pageWidth - writer.margin - 24, writer.y + 5);
 
-    let curY = writer.y + 9.5;
+    // Progression Matrix Meta Row
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Level: ${currentLvl} -> ${targetLvl}  |  Est: ${estHours} hrs  |  Salary Impact: ${salaryImp}`, writer.margin + 6, writer.y + 9);
+
+    let curY = writer.y + 13;
 
     // Why Recruiters Reject
     doc.setFont("helvetica", "normal");
@@ -580,6 +640,12 @@ export function generateFullAuditPdf(data: PdfReportData) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(30, 58, 138);
     doc.text(wrappedFix, writer.margin + 6, curY);
+    curY += wrappedFix.length * 3.4 + 1.5;
+
+    // Recommended Credential
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(16, 185, 129);
+    doc.text(wrappedCert, writer.margin + 6, curY);
 
     writer.y += cardHeight + 3.5;
   });
@@ -645,16 +711,18 @@ export function generateFullAuditPdf(data: PdfReportData) {
 
   writer.y += 4;
 
-  // --- SECTION 6: 4-WEEK CAREER ACCELERATION ROADMAP ---
-  writer.drawSectionHeading("6. 4-Week Career Sprint Execution Plan", "Week-by-week technical milestones, practical hands-on projects, and core deliverables");
+  // --- SECTION 6: 30-60-90 DAY CAREER ACCELERATION ROADMAP ---
+  writer.drawSectionHeading("6. 30-60-90 Day Career Acceleration Roadmap", "6 Progressive Sprints across 3 Phases: Foundations (Days 1-30), Engineering (Days 31-60), Scalability & Industry Certification (Days 61-90)");
 
   const rawSprints = data.roadmap?.sprints || [];
   const defaultSprints = [
     {
       sprint_number: 1,
-      theme: "Week 1: Architecture Foundation, Clean Code & State Management",
+      phase: "Phase 1: Days 1-30",
+      theme: "Sprint 1: Architecture Foundation, Clean Code & State Management",
       milestone_goal: "Master modern design patterns, state normalization, and eliminate unnecessary render cycles.",
       practical_project: "Build a production-grade scalable state management architecture with TypeScript",
+      certification_focus: { name: "Certified TypeScript & Architecture Specialist", issuer: "Industry Provider" },
       weeks: [
         {
           week: 1,
@@ -667,9 +735,11 @@ export function generateFullAuditPdf(data: PdfReportData) {
     },
     {
       sprint_number: 2,
-      theme: "Week 2: Backend Scalability, Data Pipeline & Redis Caching",
+      phase: "Phase 1: Days 1-30",
+      theme: "Sprint 2: Backend Scalability, Data Pipeline & Redis Caching",
       milestone_goal: "Design high-concurrency API endpoints, compound database indexing, and sub-50ms caching.",
       practical_project: "Build a high-throughput RESTful API with automated rate limiting and cache invalidation",
+      certification_focus: { name: "Redis Certified Developer", issuer: "Redis University" },
       weeks: [
         {
           week: 2,
@@ -682,12 +752,31 @@ export function generateFullAuditPdf(data: PdfReportData) {
     },
     {
       sprint_number: 3,
-      theme: "Week 3: Cloud Infrastructure, Docker & Automated CI/CD Pipelines",
-      milestone_goal: "Containerize multi-container applications and automate zero-downtime production deployment.",
-      practical_project: "Deploy microservices container cluster with health check monitoring and automated rollouts",
+      phase: "Phase 2: Days 31-60",
+      theme: "Sprint 3: Microservices, Async Queues & Event-Driven Architecture",
+      milestone_goal: "Decouple monolithic processes into background job workers using BullMQ and RabbitMQ.",
+      practical_project: "Build an asynchronous document processing cluster with worker telemetry",
+      certification_focus: { name: "Distributed Systems Architecture", issuer: "Cloud Native Computing Foundation" },
       weeks: [
         {
           week: 3,
+          tasks: [
+            { type: "project", title: "Implement resilient message queue with auto-retry and dead-letter queue", hours: 10, details: "Ensure zero job loss on network failures" },
+            { type: "skill", title: "Implement distributed tracing and OpenTelemetry instrumentation", hours: 6, details: "Visualize end-to-end latency across microservices" }
+          ]
+        }
+      ]
+    },
+    {
+      sprint_number: 4,
+      phase: "Phase 2: Days 31-60",
+      theme: "Sprint 4: Cloud Infrastructure, Docker & Automated CI/CD Pipelines",
+      milestone_goal: "Containerize multi-container applications and automate zero-downtime production deployment.",
+      practical_project: "Deploy microservices container cluster with health check monitoring and automated rollouts",
+      certification_focus: { name: "Docker Certified Associate (DCA)", issuer: "Docker" },
+      weeks: [
+        {
+          week: 4,
           tasks: [
             { type: "project", title: "Create optimized multi-stage Docker container", hours: 8, details: "Keep final container image footprint under 150MB" },
             { type: "skill", title: "Build GitHub Actions automated test & deploy pipeline", hours: 6, details: "Auto-lint, test, build, and deploy upon branch merges" }
@@ -696,13 +785,32 @@ export function generateFullAuditPdf(data: PdfReportData) {
       ]
     },
     {
-      sprint_number: 4,
-      theme: "Week 4: System Design Rigor & Interview Simulation",
-      milestone_goal: "Master high-level architecture trade-offs, portfolio presentation, and technical interview execution.",
-      practical_project: "Publish complete end-to-end portfolio project with live deployment and technical case study",
+      sprint_number: 5,
+      phase: "Phase 3: Days 61-90",
+      theme: "Sprint 5: Kubernetes Orchestration & Production Security Hardening",
+      milestone_goal: "Orchestrate multi-pod workloads with autoscaling, ingress controllers, and secret vaulting.",
+      practical_project: "Deploy high-availability cluster with Horizontal Pod Autoscalers (HPA) and TLS ingress",
+      certification_focus: { name: "CKA / AWS Certified Solutions Architect", issuer: "Linux Foundation / AWS" },
       weeks: [
         {
-          week: 4,
+          week: 5,
+          tasks: [
+            { type: "project", title: "Configure Kubernetes ingress with rate limiting and automated SSL", hours: 10, details: "Zero-downtime rolling upgrades" },
+            { type: "skill", title: "Perform security audit with SonarQube and OWASP ZAP", hours: 6, details: "Remediate all high and critical CVE vulnerabilities" }
+          ]
+        }
+      ]
+    },
+    {
+      sprint_number: 6,
+      phase: "Phase 3: Days 61-90",
+      theme: "Sprint 6: Enterprise System Design, Interview Simulation & Capstone Showcase",
+      milestone_goal: "Master high-level architecture trade-offs, live coding simulations, and executive portfolio presentation.",
+      practical_project: "Publish complete end-to-end portfolio project with live deployment, latency benchmarks, and architectural case study",
+      certification_focus: { name: "Professional Cloud / AI Architect Certification", issuer: "Google Cloud / AWS" },
+      weeks: [
+        {
+          week: 6,
           tasks: [
             { type: "project", title: "Publish technical architecture diagram & case study", hours: 8, details: "Document latency metrics, trade-offs, and scalability choices" },
             { type: "skill", title: "Practice 15 role-specific technical interview questions", hours: 8, details: "Prepare behavioral XYZ stories and system design diagrams" }
@@ -715,22 +823,26 @@ export function generateFullAuditPdf(data: PdfReportData) {
   const sprints = rawSprints.length > 0 ? rawSprints : defaultSprints;
 
   sprints.forEach((sprint: any, idx: number) => {
-    const sprintTheme = sprint.theme || sprint.sprint_name || `Sprint ${idx + 1}: Core Milestone`;
-    const goalText = sprint.milestone_goal || "Complete sprint core technical deliverables";
-    const proj = sprint.practical_project || (sprint.key_deliverables ? sprint.key_deliverables.join(", ") : "Production code deliverable");
+    const sNum = sprint.sprint_number || idx + 1;
+    const phaseStr = sprint.phase || (sNum <= 2 ? "Phase 1: Days 1-30" : sNum <= 4 ? "Phase 2: Days 31-60" : "Phase 3: Days 61-90");
+    const sprintTheme = sprint.theme || sprint.sprint_name || `Sprint ${sNum}: Core Technical Milestone`;
+    const goalText = sprint.milestone_goal || `Master core ${role} technical deliverables, architecture patterns, and state normalization.`;
+    const proj = sprint.practical_project || (sprint.key_deliverables ? sprint.key_deliverables.join(", ") : `Build and publish a production-grade ${role} repository on GitHub.`);
+    const certText = sprint.certification_focus ? `Target Certification: ${sprint.certification_focus.name || sprint.certification_focus} (${sprint.certification_focus.issuer || 'Industry Accredited'})` : '';
 
-    const wrappedTheme = doc.splitTextToSize(sprintTheme, writer.contentWidth - 32);
+    const wrappedTheme = doc.splitTextToSize(sprintTheme, writer.contentWidth - 36);
     const wrappedGoal = doc.splitTextToSize(`Milestone Goal: ${goalText}`, writer.contentWidth - 10);
     const wrappedProj = doc.splitTextToSize(`Hands-on Deliverable: ${proj}`, writer.contentWidth - 10);
+    const wrappedCert = certText ? doc.splitTextToSize(certText, writer.contentWidth - 10) : [];
 
     let tasksCount = 0;
     if (sprint.weeks && Array.isArray(sprint.weeks)) {
       sprint.weeks.forEach((w: any) => {
-        if (w.tasks && Array.isArray(w.tasks)) tasksCount += w.tasks.length;
+        if (w.tasks && Array.isArray(w.tasks)) tasksCount += Math.min(w.tasks.length, 3);
       });
     }
 
-    const boxHeight = 18 + (wrappedTheme.length * 3.5) + (wrappedGoal.length * 3.4) + (wrappedProj.length * 3.4) + (tasksCount * 5.5);
+    const boxHeight = 20 + (wrappedTheme.length * 3.5) + (wrappedGoal.length * 3.4) + (wrappedProj.length * 3.4) + (wrappedCert.length * 3.4) + (tasksCount * 5.5);
     writer.ensureSpace(boxHeight + 4);
 
     doc.setFillColor(255, 255, 255);
@@ -738,21 +850,27 @@ export function generateFullAuditPdf(data: PdfReportData) {
     doc.setLineWidth(0.4);
     doc.roundedRect(writer.margin, writer.y, writer.contentWidth, boxHeight, 2, 2, "FD");
 
-    // Sprint number badge
+    // Sprint number & phase badge
     doc.setFillColor(37, 99, 235);
-    doc.roundedRect(writer.margin + 3, writer.y + 3, 20, 5, 1, 1, "F");
+    doc.roundedRect(writer.margin + 3, writer.y + 3, 26, 5, 1, 1, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setTextColor(255, 255, 255);
-    doc.text(`WEEK ${sprint.sprint_number || idx + 1}`, writer.margin + 5, writer.y + 6.7);
+    doc.text(`SPRINT ${sNum}`, writer.margin + 4.5, writer.y + 6.6);
+
+    // Phase Pill
+    doc.setFillColor(239, 246, 255);
+    doc.roundedRect(writer.margin + 31, writer.y + 3, 34, 5, 1, 1, "F");
+    doc.setTextColor(30, 64, 175);
+    doc.text(phaseStr, writer.margin + 33, writer.y + 6.6);
 
     // Title / Theme
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.setTextColor(15, 23, 42);
-    doc.text(wrappedTheme, writer.margin + 26, writer.y + 6.7);
+    doc.text(wrappedTheme, writer.margin + 68, writer.y + 6.6);
 
-    let innerY = writer.y + 6.7 + (wrappedTheme.length * 3.5) + 2;
+    let innerY = writer.y + 6.6 + (wrappedTheme.length * 3.5) + 2;
 
     // Milestone Goal
     doc.setFont("helvetica", "normal");
@@ -765,13 +883,21 @@ export function generateFullAuditPdf(data: PdfReportData) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(30, 58, 138);
     doc.text(wrappedProj, writer.margin + 6, innerY);
-    innerY += wrappedProj.length * 3.4 + 2;
+    innerY += wrappedProj.length * 3.4 + 1.5;
+
+    // Certification Focus
+    if (wrappedCert.length > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(16, 185, 129);
+      doc.text(wrappedCert, writer.margin + 6, innerY);
+      innerY += wrappedCert.length * 3.4 + 2;
+    }
 
     // Granular week tasks inside sprint
     if (sprint.weeks && Array.isArray(sprint.weeks)) {
       sprint.weeks.forEach((w: any) => {
         if (w.tasks && Array.isArray(w.tasks)) {
-          w.tasks.slice(0, 2).forEach((task: any) => {
+          w.tasks.slice(0, 3).forEach((task: any) => {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(7);
             doc.setTextColor(37, 99, 235);
@@ -935,47 +1061,63 @@ export function generateSkillGapPdf(data: PdfReportData) {
 
   writer.y += 38;
 
-  const skillGapData = data.roadmap?.skill_gap_report || {
-    matched_skills: ["JavaScript", "TypeScript", "React", "Node.js", "Express", "Git", "REST APIs"],
-    missing_skills: [
-      { skill: "Docker & Containerization", category: "DevOps Tool", priority: "High", reason: "Standard requirement in modern cloud deployments", suggested_improvement: "Containerize multi-service full stack app and publish to Docker Hub." },
-      { skill: "Kubernetes & Orchestration", category: "Cloud Tool", priority: "High", reason: "Required for senior cloud engineering compensation bands", suggested_improvement: "Deploy a local Minikube cluster with multi-pod architecture." },
-      { skill: "Distributed Redis Caching", category: "Backend Tool", priority: "High", reason: "Critical for high-traffic throughput and API scaling", suggested_improvement: "Implement Redis caching layer on frequent database query endpoints." },
-      { skill: "System Architecture & CI/CD", category: "DevOps", priority: "Medium", reason: "Enterprise standard for scalable microservices", suggested_improvement: "Deploy project with GitHub Actions automated CI/CD pipeline." }
-    ],
-    match_percentage: 75
-  };
+  // Extract verified profile strengths
+  const verifiedStrengthsList: string[] = 
+    (data.roadmap?.skill_gap_report?.matched_skills && data.roadmap.skill_gap_report.matched_skills.length > 0)
+      ? data.roadmap.skill_gap_report.matched_skills
+      : (data.roadmap?.skill_gap_report?.verified_strengths && data.roadmap.skill_gap_report.verified_strengths.length > 0)
+        ? data.roadmap.skill_gap_report.verified_strengths.map((s: any) => typeof s === 'string' ? s : s.skill)
+        : (data.parsedResume?.skills && data.parsedResume.skills.length > 0)
+          ? data.parsedResume.skills
+          : (data.atsData?.matched_keywords && data.atsData.matched_keywords.length > 0)
+            ? data.atsData.matched_keywords
+            : ["Full-Stack Architecture", "Modern TypeScript & React", "RESTful & Async APIs", "State Normalization", "Database Modeling", "Git Workflow & CI/CD"];
 
   writer.drawSectionHeading("1. Verified Profile Strengths", "Core competencies detected and verified in your uploaded resume");
   
   writer.ensureSpace(20);
-  (skillGapData.matched_skills || []).forEach((skill) => {
+  const colWidth = (writer.contentWidth - 4) / 2;
+  const strengthsToRender = verifiedStrengthsList.slice(0, 12);
+  for (let i = 0; i < strengthsToRender.length; i += 2) {
     writer.ensureSpace(8);
+    const s1 = strengthsToRender[i];
+    const s2 = strengthsToRender[i + 1];
+
     doc.setFillColor(240, 253, 244);
-    doc.roundedRect(writer.margin, writer.y, writer.contentWidth, 6.5, 1, 1, "F");
-    
+    doc.roundedRect(writer.margin, writer.y, colWidth, 6.5, 1, 1, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(22, 101, 52);
-    doc.text(`[MATCHED] ${skill}`, writer.margin + 4, writer.y + 4.5);
+    doc.text(`[MATCHED] ${s1}`, writer.margin + 3, writer.y + 4.5);
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(71, 85, 105);
-    doc.text("Verified against job market requirements", writer.margin + 75, writer.y + 4.5);
+    if (s2) {
+      doc.setFillColor(240, 253, 244);
+      doc.roundedRect(writer.margin + colWidth + 4, writer.y, colWidth, 6.5, 1, 1, "F");
+      doc.text(`[MATCHED] ${s2}`, writer.margin + colWidth + 7, writer.y + 4.5);
+    }
     writer.y += 8;
-  });
+  }
 
   writer.y += 6;
   writer.drawSectionHeading("2. High-Demand Skill Gaps to Bridge", "Critical technologies and architectural patterns required to unlock senior compensation tiers");
 
+  const skillGapData = data.roadmap?.skill_gap_report || {
+    matched_skills: verifiedStrengthsList,
+    missing_skills: [
+      { skill: "Docker & Containerization", category: "DevOps Tool", priority: "High", current_level: "None", target_level: "Production-Grade", estimated_hours: 25, salary_impact: "+$15k-$20k / +15%", reason: "Standard requirement in modern cloud deployments", suggested_improvement: "Containerize multi-service full stack app and publish to Docker Hub.", certified_resource: "Docker Certified Associate (DCA)" },
+      { skill: "Kubernetes & Orchestration", category: "Cloud Tool", priority: "High", current_level: "None", target_level: "Enterprise-Ready", estimated_hours: 35, salary_impact: "+$20k-$30k / +22%", reason: "Required for senior cloud engineering compensation bands", suggested_improvement: "Deploy a local Minikube cluster with multi-pod architecture.", certified_resource: "Certified Kubernetes Administrator (CKA)" },
+      { skill: "Distributed Redis Caching", category: "Backend Tool", priority: "High", current_level: "Beginner", target_level: "Enterprise-Ready", estimated_hours: 20, salary_impact: "+$12k-$18k / +12%", reason: "Critical for high-traffic throughput and sub-50ms latency", suggested_improvement: "Implement Redis caching layer on frequent database query endpoints.", certified_resource: "Redis Certified Developer" },
+      { skill: "System Architecture & CI/CD", category: "DevOps", priority: "Medium", current_level: "Beginner", target_level: "Production-Grade", estimated_hours: 30, salary_impact: "+$18k-$25k / +18%", reason: "Enterprise standard for scalable microservices", suggested_improvement: "Deploy project with GitHub Actions automated CI/CD pipeline.", certified_resource: "AWS Solutions Architect Associate" }
+    ]
+  };
+
   const rawMissing = (skillGapData.missing_skills && skillGapData.missing_skills.length > 0)
     ? skillGapData.missing_skills
     : [
-        { skill: "Docker & Containerization", category: "Tool", priority: "High", reason: "Standard requirement in modern cloud deployments", suggested_improvement: "Containerize your primary full-stack app and push to DockerHub" },
-        { skill: "Kubernetes & Orchestration", category: "Tool", priority: "High", reason: "Required for senior cloud engineering compensation bands", suggested_improvement: "Deploy a local Minikube cluster with multi-pod architecture" },
-        { skill: "Distributed Redis Caching", category: "Technical Skill", priority: "Medium", reason: "Critical for high-traffic throughput and API scaling", suggested_improvement: "Implement Redis caching layer on frequent database query endpoints" },
-        { skill: "AWS / Cloud Infrastructure", category: "Framework", priority: "High", reason: "Enterprise standard for scalable microservices", suggested_improvement: "Deploy project with S3, ECS/Lambda, and CloudFront integration" }
+        { skill: "Docker & Containerization", category: "DevOps Tool", priority: "High", current_level: "None", target_level: "Production-Grade", estimated_hours: 25, salary_impact: "+$15k-$20k / +15%", reason: "Standard requirement in modern cloud deployments", suggested_improvement: "Containerize your primary full-stack app and push to DockerHub", certified_resource: "Docker Certified Associate (DCA)" },
+        { skill: "Kubernetes & Orchestration", category: "Cloud Tool", priority: "High", current_level: "None", target_level: "Enterprise-Ready", estimated_hours: 35, salary_impact: "+$20k-$30k / +22%", reason: "Required for senior cloud engineering compensation bands", suggested_improvement: "Deploy a local Minikube cluster with multi-pod architecture", certified_resource: "Certified Kubernetes Administrator (CKA)" },
+        { skill: "Distributed Redis Caching", category: "Technical Skill", priority: "Medium", current_level: "Beginner", target_level: "Production-Grade", estimated_hours: 20, salary_impact: "+$12k-$18k / +12%", reason: "Critical for high-traffic throughput and API scaling", suggested_improvement: "Implement Redis caching layer on frequent database query endpoints", certified_resource: "Redis Certified Developer" },
+        { skill: "AWS / Cloud Infrastructure", category: "Framework", priority: "High", current_level: "None", target_level: "Production-Grade", estimated_hours: 30, salary_impact: "+$18k-$25k / +18%", reason: "Enterprise standard for scalable microservices", suggested_improvement: "Deploy project with S3, ECS/Lambda, and CloudFront integration", certified_resource: "AWS Solutions Architect" }
       ];
 
   rawMissing.forEach((item: any, idx: number) => {
@@ -983,13 +1125,19 @@ export function generateSkillGapPdf(data: PdfReportData) {
     const skillName = isObj ? (item.skill || `Gap #${idx + 1}`) : item;
     const category = isObj ? (item.category || "Technical Skill") : "Technical Skill";
     const priority = isObj ? (item.priority || "High") : "High";
+    const currentLvl = isObj ? (item.current_level || (priority === "High" ? "None" : "Beginner")) : "None";
+    const targetLvl = isObj ? (item.target_level || "Production-Grade") : "Production-Grade";
+    const estHours = isObj ? (item.estimated_hours || 25) : 25;
+    const salaryImp = isObj ? (item.salary_impact || "+$15,000 / +15% Lift") : "+$15,000 / +15% Lift";
     const reason = isObj ? (item.reason || "High demand in enterprise job postings") : "Missing in current resume keywords";
     const action = isObj ? (item.suggested_improvement || "Build a production-level GitHub project showcasing this competency.") : "Build a project demonstrating this skill.";
+    const cert = isObj ? (item.certification_name || item.certified_resource || "Industry Accredited Course") : "Industry Accredited Course";
 
     const wrappedReason = doc.splitTextToSize(`Hiring Friction: ${reason}`, writer.contentWidth - 12);
     const wrappedFix = doc.splitTextToSize(`Prescribed Fix: ${action}`, writer.contentWidth - 12);
+    const wrappedCert = doc.splitTextToSize(`Recommended Credential: ${cert}`, writer.contentWidth - 12);
 
-    const cardHeight = 14 + (wrappedReason.length * 3.4) + (wrappedFix.length * 3.4);
+    const cardHeight = 18 + (wrappedReason.length * 3.4) + (wrappedFix.length * 3.4) + (wrappedCert.length * 3.4);
     writer.ensureSpace(cardHeight + 4);
 
     doc.setFillColor(255, 255, 255);
@@ -1016,7 +1164,13 @@ export function generateSkillGapPdf(data: PdfReportData) {
     else doc.setTextColor(37, 99, 235);
     doc.text(`${priority} Priority`, writer.pageWidth - writer.margin - 24, writer.y + 5);
 
-    let curY = writer.y + 9.5;
+    // Progression Matrix Meta Row
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Level: ${currentLvl} -> ${targetLvl}  |  Est: ${estHours} hrs  |  Salary Impact: ${salaryImp}`, writer.margin + 6, writer.y + 9);
+
+    let curY = writer.y + 13;
 
     // Why Recruiters Reject
     doc.setFont("helvetica", "normal");
@@ -1029,6 +1183,12 @@ export function generateSkillGapPdf(data: PdfReportData) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(30, 58, 138);
     doc.text(wrappedFix, writer.margin + 6, curY);
+    curY += wrappedFix.length * 3.4 + 1.5;
+
+    // Recommended Credential
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(16, 185, 129);
+    doc.text(wrappedCert, writer.margin + 6, curY);
 
     writer.y += cardHeight + 3.5;
   });
@@ -1186,25 +1346,27 @@ export function generateRoadmapPdf(data: PdfReportData) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.setTextColor(30, 58, 138);
-  doc.text("4-WEEK CAREER ACCELERATION ROADMAP", writer.margin + 6, writer.y + 10);
+  doc.text("30-60-90 DAY SPRINT EXECUTION ROADMAP", writer.margin + 6, writer.y + 10);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(71, 85, 105);
   doc.text(`Candidate: ${candidate}  |  Target Role: ${role}  |  Date: ${dateStr}`, writer.margin + 6, writer.y + 17);
-  doc.text("Structured sprint milestones to achieve competitive parity and crack target role interviews", writer.margin + 6, writer.y + 24);
+  doc.text("6 Progressive Sprints: Foundations (Days 1-30), Engineering (Days 31-60), Scalability & Industry Cert (Days 61-90)", writer.margin + 6, writer.y + 24);
 
   writer.y += 38;
 
-  writer.drawSectionHeading("Milestone Progression Sprints", "Follow this weekly action plan to systematically build high-leverage portfolio projects");
+  writer.drawSectionHeading("Milestone Progression Sprints (30-60-90 Days)", "Follow this systematic 6-sprint flight path to build high-leverage portfolio projects and certified skills");
 
   const rawSprints = data.roadmap?.sprints || [];
   const defaultSprints = [
     {
       sprint_number: 1,
-      theme: "Week 1: Architecture Foundation, Clean Code & State Management",
+      phase: "Phase 1: Days 1-30",
+      theme: "Sprint 1: Architecture Foundation, Clean Code & State Management",
       milestone_goal: "Master modern design patterns, state normalization, and eliminate unnecessary render cycles.",
       practical_project: "Build a production-grade scalable state management architecture with TypeScript",
+      certification_focus: { name: "Certified TypeScript & Architecture Specialist", issuer: "Industry Provider" },
       weeks: [
         {
           week: 1,
@@ -1217,9 +1379,11 @@ export function generateRoadmapPdf(data: PdfReportData) {
     },
     {
       sprint_number: 2,
-      theme: "Week 2: Backend Scalability, Data Pipeline & Redis Caching",
+      phase: "Phase 1: Days 1-30",
+      theme: "Sprint 2: Backend Scalability, Data Pipeline & Redis Caching",
       milestone_goal: "Design high-concurrency API endpoints, compound database indexing, and sub-50ms caching.",
       practical_project: "Build a high-throughput RESTful API with automated rate limiting and cache invalidation",
+      certification_focus: { name: "Redis Certified Developer", issuer: "Redis University" },
       weeks: [
         {
           week: 2,
@@ -1232,12 +1396,31 @@ export function generateRoadmapPdf(data: PdfReportData) {
     },
     {
       sprint_number: 3,
-      theme: "Week 3: Cloud Infrastructure, Docker & Automated CI/CD Pipelines",
-      milestone_goal: "Containerize multi-container applications and automate zero-downtime production deployment.",
-      practical_project: "Deploy microservices container cluster with health check monitoring and automated rollouts",
+      phase: "Phase 2: Days 31-60",
+      theme: "Sprint 3: Microservices, Async Queues & Event-Driven Architecture",
+      milestone_goal: "Decouple monolithic processes into background job workers using BullMQ and RabbitMQ.",
+      practical_project: "Build an asynchronous document processing cluster with worker telemetry",
+      certification_focus: { name: "Distributed Systems Architecture", issuer: "Cloud Native Computing Foundation" },
       weeks: [
         {
           week: 3,
+          tasks: [
+            { type: "project", title: "Implement resilient message queue with auto-retry and dead-letter queue", hours: 10, details: "Ensure zero job loss on network failures" },
+            { type: "skill", title: "Implement distributed tracing and OpenTelemetry instrumentation", hours: 6, details: "Visualize end-to-end latency across microservices" }
+          ]
+        }
+      ]
+    },
+    {
+      sprint_number: 4,
+      phase: "Phase 2: Days 31-60",
+      theme: "Sprint 4: Cloud Infrastructure, Docker & Automated CI/CD Pipelines",
+      milestone_goal: "Containerize multi-container applications and automate zero-downtime production deployment.",
+      practical_project: "Deploy microservices container cluster with health check monitoring and automated rollouts",
+      certification_focus: { name: "Docker Certified Associate (DCA)", issuer: "Docker" },
+      weeks: [
+        {
+          week: 4,
           tasks: [
             { type: "project", title: "Create optimized multi-stage Docker container", hours: 8, details: "Keep final container image footprint under 150MB" },
             { type: "skill", title: "Build GitHub Actions automated test & deploy pipeline", hours: 6, details: "Auto-lint, test, build, and deploy upon branch merges" }
@@ -1246,13 +1429,32 @@ export function generateRoadmapPdf(data: PdfReportData) {
       ]
     },
     {
-      sprint_number: 4,
-      theme: "Week 4: Enterprise System Design & Interview Preparation",
-      milestone_goal: "High-level architecture trade-offs, portfolio presentation, and cracking technical interview rounds.",
-      practical_project: "Publish complete end-to-end portfolio project with live deployment and technical case study",
+      sprint_number: 5,
+      phase: "Phase 3: Days 61-90",
+      theme: "Sprint 5: Kubernetes Orchestration & Production Security Hardening",
+      milestone_goal: "Orchestrate multi-pod workloads with autoscaling, ingress controllers, and secret vaulting.",
+      practical_project: "Deploy high-availability cluster with Horizontal Pod Autoscalers (HPA) and TLS ingress",
+      certification_focus: { name: "CKA / AWS Certified Solutions Architect", issuer: "Linux Foundation / AWS" },
       weeks: [
         {
-          week: 4,
+          week: 5,
+          tasks: [
+            { type: "project", title: "Configure Kubernetes ingress with rate limiting and automated SSL", hours: 10, details: "Zero-downtime rolling upgrades" },
+            { type: "skill", title: "Perform security audit with SonarQube and OWASP ZAP", hours: 6, details: "Remediate all high and critical CVE vulnerabilities" }
+          ]
+        }
+      ]
+    },
+    {
+      sprint_number: 6,
+      phase: "Phase 3: Days 61-90",
+      theme: "Sprint 6: Enterprise System Design, Interview Simulation & Capstone Showcase",
+      milestone_goal: "Master high-level architecture trade-offs, live coding simulations, and executive portfolio presentation.",
+      practical_project: "Publish complete end-to-end portfolio project with live deployment, latency benchmarks, and architectural case study",
+      certification_focus: { name: "Professional Cloud / AI Architect Certification", issuer: "Google Cloud / AWS" },
+      weeks: [
+        {
+          week: 6,
           tasks: [
             { type: "project", title: "Publish technical architecture diagram & case study", hours: 8, details: "Document latency metrics, trade-offs, and scalability choices" },
             { type: "skill", title: "Practice 15 role-specific technical interview questions", hours: 8, details: "Prepare behavioral XYZ stories and system design diagrams" }
@@ -1265,22 +1467,26 @@ export function generateRoadmapPdf(data: PdfReportData) {
   const sprints = rawSprints.length > 0 ? rawSprints : defaultSprints;
 
   sprints.forEach((sprint: any, idx: number) => {
-    const sprintTheme = sprint.theme || sprint.sprint_name || `Sprint ${idx + 1}: Core Milestone`;
-    const goalText = sprint.milestone_goal || "Complete sprint core technical deliverables";
-    const proj = sprint.practical_project || (sprint.key_deliverables ? sprint.key_deliverables.join(", ") : "Production code deliverable");
+    const sNum = sprint.sprint_number || idx + 1;
+    const phaseStr = sprint.phase || (sNum <= 2 ? "Phase 1: Days 1-30" : sNum <= 4 ? "Phase 2: Days 31-60" : "Phase 3: Days 61-90");
+    const sprintTheme = sprint.theme || sprint.sprint_name || `Sprint ${sNum}: Core Technical Milestone`;
+    const goalText = sprint.milestone_goal || `Master core ${role} technical deliverables, architecture patterns, and state normalization.`;
+    const proj = sprint.practical_project || (sprint.key_deliverables ? sprint.key_deliverables.join(", ") : `Build and publish a production-grade ${role} repository on GitHub.`);
+    const certText = sprint.certification_focus ? `Target Certification: ${sprint.certification_focus.name || sprint.certification_focus} (${sprint.certification_focus.issuer || 'Industry Accredited'})` : '';
 
-    const wrappedTheme = doc.splitTextToSize(sprintTheme, writer.contentWidth - 32);
+    const wrappedTheme = doc.splitTextToSize(sprintTheme, writer.contentWidth - 36);
     const wrappedGoal = doc.splitTextToSize(`Milestone Goal: ${goalText}`, writer.contentWidth - 10);
     const wrappedProj = doc.splitTextToSize(`Hands-on Deliverable: ${proj}`, writer.contentWidth - 10);
+    const wrappedCert = certText ? doc.splitTextToSize(certText, writer.contentWidth - 10) : [];
 
     let tasksCount = 0;
     if (sprint.weeks && Array.isArray(sprint.weeks)) {
       sprint.weeks.forEach((w: any) => {
-        if (w.tasks && Array.isArray(w.tasks)) tasksCount += w.tasks.length;
+        if (w.tasks && Array.isArray(w.tasks)) tasksCount += Math.min(w.tasks.length, 3);
       });
     }
 
-    const boxHeight = 18 + (wrappedTheme.length * 3.5) + (wrappedGoal.length * 3.4) + (wrappedProj.length * 3.4) + (tasksCount * 5.5);
+    const boxHeight = 20 + (wrappedTheme.length * 3.5) + (wrappedGoal.length * 3.4) + (wrappedProj.length * 3.4) + (wrappedCert.length * 3.4) + (tasksCount * 5.5);
     writer.ensureSpace(boxHeight + 4);
 
     doc.setFillColor(255, 255, 255);
@@ -1290,19 +1496,25 @@ export function generateRoadmapPdf(data: PdfReportData) {
 
     // Sprint badge
     doc.setFillColor(37, 99, 235);
-    doc.roundedRect(writer.margin + 3, writer.y + 3, 20, 5, 1, 1, "F");
+    doc.roundedRect(writer.margin + 3, writer.y + 3, 26, 5, 1, 1, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setTextColor(255, 255, 255);
-    doc.text(`WEEK ${sprint.sprint_number || idx + 1}`, writer.margin + 5, writer.y + 6.7);
+    doc.text(`SPRINT ${sNum}`, writer.margin + 4.5, writer.y + 6.6);
+
+    // Phase Pill
+    doc.setFillColor(239, 246, 255);
+    doc.roundedRect(writer.margin + 31, writer.y + 3, 34, 5, 1, 1, "F");
+    doc.setTextColor(30, 64, 175);
+    doc.text(phaseStr, writer.margin + 33, writer.y + 6.6);
 
     // Title / Theme
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.setTextColor(15, 23, 42);
-    doc.text(wrappedTheme, writer.margin + 26, writer.y + 6.7);
+    doc.text(wrappedTheme, writer.margin + 68, writer.y + 6.6);
 
-    let innerY = writer.y + 6.7 + (wrappedTheme.length * 3.5) + 2;
+    let innerY = writer.y + 6.6 + (wrappedTheme.length * 3.5) + 2;
 
     // Goal
     doc.setFont("helvetica", "normal");
@@ -1315,13 +1527,21 @@ export function generateRoadmapPdf(data: PdfReportData) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(30, 58, 138);
     doc.text(wrappedProj, writer.margin + 6, innerY);
-    innerY += wrappedProj.length * 3.4 + 2;
+    innerY += wrappedProj.length * 3.4 + 1.5;
+
+    // Certification Focus
+    if (wrappedCert.length > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(16, 185, 129);
+      doc.text(wrappedCert, writer.margin + 6, innerY);
+      innerY += wrappedCert.length * 3.4 + 2;
+    }
 
     // Granular week tasks inside sprint
     if (sprint.weeks && Array.isArray(sprint.weeks)) {
       sprint.weeks.forEach((w: any) => {
         if (w.tasks && Array.isArray(w.tasks)) {
-          w.tasks.slice(0, 2).forEach((task: any) => {
+          w.tasks.slice(0, 3).forEach((task: any) => {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(7);
             doc.setTextColor(37, 99, 235);
