@@ -210,17 +210,17 @@ export function Dashboard({
             },
             {
               id: 'roadmap',
-              title: '4-Week Career Sprint Roadmap',
-              badge: 'STEP-BY-STEP EXECUTION',
+              title: '30-60-90 Day Career Acceleration Roadmap',
+              badge: '6 PROGRESSIVE SPRINTS & CERTS',
               badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
               icon: Map,
               color: 'text-amber-500',
               bg: 'bg-amber-500/10',
-              desc: 'A hyper-focused weekly execution plan with hands-on projects designed to take you from your current state to interview-ready.',
+              desc: 'A hyper-focused 6-sprint execution plan across 3 progressive phases (Foundations, Production Engineering, and Cloud Scalability) with hands-on projects and industry certifications.',
               deliverables: [
-                '4 Structured weekly milestone themes & hands-on deliverables',
-                'Daily task checklists with realistic study hour allocations',
-                'Production-grade GitHub portfolio deliverables per sprint'
+                '6 Structured sprint milestone themes & production deliverables',
+                'Phase 1-3 progression (Days 1-30, Days 31-60, Days 61-90)',
+                'Production-grade GitHub portfolio projects & industry certifications per sprint'
               ]
             },
             {

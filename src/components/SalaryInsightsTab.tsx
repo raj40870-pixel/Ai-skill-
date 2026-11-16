@@ -64,10 +64,10 @@ export function SalaryInsightsTab({
   
   const getEffectiveRole = () => {
     if (resumeData?.targetRole && resumeData.targetRole !== "Career Search") return resumeData.targetRole;
-    if (targetRole && targetRole !== "Career Search" && targetRole !== "Senior Full Stack Engineer") return targetRole;
+    if (targetRole && targetRole !== "Career Search") return targetRole;
     if (resumeData?.preferences?.targetRole) return resumeData.preferences.targetRole;
     if (resumeData?.parsedData?.experience?.[0]?.role) return resumeData.parsedData.experience[0].role;
-    return null;
+    return targetRole || "Software Engineer";
   };
 
   const [activeRole, setActiveRole] = useState<string | null>(getEffectiveRole);

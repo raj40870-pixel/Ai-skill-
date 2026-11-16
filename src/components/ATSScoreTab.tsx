@@ -94,7 +94,7 @@ export function ATSScoreTab({ resumeData, atsData, roadmap, user, onNavigate, on
     );
   }
 
-  const evaluatedRole = atsData.evaluatedRole || resumeData?.targetRole || roadmap?.title?.replace("Learning Roadmap for ", "") || "Target Role";
+  const evaluatedRole = atsData.evaluatedRole || resumeData?.targetRole || (roadmap?.title ? roadmap.title.replace(/^30-60-90 Day Career Roadmap for\s*/i, "").replace(/^Learning Roadmap for\s*/i, "").trim() : "Target Role");
   const breakdown = Array.isArray(atsData.breakdown) ? atsData.breakdown : [];
   const computedSum = breakdown.length > 0
     ? breakdown.reduce((sum: number, item: any) => sum + (Number(item.score) || 0), 0)
