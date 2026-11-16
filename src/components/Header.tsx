@@ -44,6 +44,7 @@ export function Header({ activeTab, onTabChange, onLogout, user }: HeaderProps) 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     ...(isAdmin ? [{ id: 'admin', label: 'Admin Panel', icon: ShieldCheck }] : []),
+    { id: 'profile', label: 'Profile', icon: User },
     { id: 'upload', label: 'Resume Upload', icon: Upload },
     { id: 'ats', label: 'ATS Score', icon: BarChart3 },
     { id: 'skillgap', label: 'Skill Gap Analysis', icon: Zap },
@@ -55,7 +56,6 @@ export function Header({ activeTab, onTabChange, onLogout, user }: HeaderProps) 
     { id: 'history', label: 'History', icon: History },
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'support', label: 'Help Desk', icon: LifeBuoy },
-    { id: 'profile', label: 'Profile', icon: User },
     { id: 'logout', label: 'Logout', icon: LogOut },
   ];
 
