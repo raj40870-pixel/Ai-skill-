@@ -1,11 +1,34 @@
 # 🚀 Career Navigation AI — Frontend Client & Web Platform
 
+[![Ideathon Winner](https://img.shields.io/badge/Ideathon-2nd%20Prize%20Winner%20🥈-FFD700?style=for-the-badge&logo=target&logoColor=black)](https://carrer-nav-ai.vercel.app)
+[![Team The Hustlers](https://img.shields.io/badge/Team-The%20Hustlers-FF5722?style=for-the-badge&logo=shield)](https://github.com/raj40870-pixel/Ai-skill-)
 [![Live Application](https://img.shields.io/badge/Live-carrer--nav--ai.vercel.app-blue?style=for-the-badge&logo=vercel)](https://carrer-nav-ai.vercel.app)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+
+---
+
+## 🏆 Award & Ideathon Recognition
+
+### 🥈 **Second Prize Winner — Next Gen Web Impact Challenge Ideathon**
+* **Event:** Next Gen Web Impact Challenge Ideathon (November 2026)
+* **Organized by:** Brain Storm Project Club • Lovely Professional University (LPU)
+* **Awarded to:** **Team The Hustlers**
+* **Team Members:**
+  * **Kamaljit** — Lead Full-Stack Architect & AI System Engineer (BCA, Lovely Professional University)
+  * **Mantaj** — Co-Developer & UI/UX Presentation Lead (Team The Hustlers)
+* **Live Production App:** [carrer-nav-ai.vercel.app](https://carrer-nav-ai.vercel.app)
+* **Pitch Deck:** [Presentation Deck (.pptx)](public/The_Hustlers_Career_Nav_AI_Presentation.pptx)
+
+<div align="center">
+  <img src="assets/ideathon_second_prize_trophy.jpg" alt="Next Gen Web Impact Challenge Ideathon - Second Prize Trophy" width="380" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" />
+  <p><em>🏆 Team The Hustlers (Kamaljit & Mantaj) awarded 2nd Prize at Lovely Professional University</em></p>
+</div>
+
+---
 
 An enterprise-grade, full-stack AI career acceleration platform. **Career Navigation AI** combines real-time resume parsing, **Dual-Engine ATS scoring**, dynamic 4-role market calibration, personalized 30-60-90 day learning roadmaps, interactive STAR interview coaching, and localized salary benchmarks powered by Google Gemini AI.
 
